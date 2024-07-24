@@ -29,12 +29,12 @@
 
 ## Repository Structure
 
-- **[Docs](https://ShulcN/DroneModel/Docs)** - Directory with documentation
-    - **[references.md](https://ShulcN/DroneModel/Docs/references.md)** - Links to sources
-- **[Hardware](https://ShulcN/DroneModel/Hardware)** - Connection diagrams, links to modules, and manuals
-- **[Matlab](https://ShulcN/DroneModel/Matlab)** - Drone modeling files in Matlab
-- **[Software](https://ShulcN/DroneModel/Software)** - Code for the drone
-- **[SolidWorks](https://ShulcN/DroneModel/SolidWorks)** - Directory with 3D modeling files
+- **[Docs](https://github.com/ShulcN/DroneModel/tree/main/Docs)** - Directory with documentation
+    - **[references.md](https://github.com/ShulcN/DroneModel/tree/main/Docs/references.md)** - Links to sources
+- **[Hardware](https://github.com/ShulcN/DroneModel/tree/main/Hardware)** - Connection diagrams, links to modules, and manuals
+- **[Matlab](https://github.com/ShulcN/DroneModel/tree/main/Matlab)** - Drone modeling files in Matlab
+- **[Software](https://github.com/ShulcN/DroneModel/tree/main/Software)** - Code for the drone
+- **[SolidWorks](https://github.com/ShulcN/DroneModel/tree/main/SolidWorks)** - Directory with 3D modeling files
 
 ## Work Plan
 
