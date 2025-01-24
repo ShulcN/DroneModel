@@ -9,14 +9,13 @@
 
 - Creating a brushless motor model in Simulink
 - Creating a quadcopter model in Simulink
-- Creating an electronic circuit
 - Writing minimal code for the drone:
     - motor control
     - accelerometer interaction
 - Creating a 3D model of the quadcopter
 - Printing and assembling
 - Solving noise filtering issues
-- Calculating a controller for drone stabilization
+- Calculating and modeling a controller for drone stabilization and tracking trajectory
 - Programming control laws and debugging
 
 ### Optional Part
@@ -25,16 +24,16 @@
 - Controlling the drone via MQTT protocol
 - Setting up a message exchange server
 - Connecting a camera
+- Creating an electronic circuit
 ...
 
 ## Repository Structure
 
 - **[Docs](https://github.com/ShulcN/DroneModel/tree/main/Docs)** - Directory with documentation
-    - **[references.md](https://github.com/ShulcN/DroneModel/tree/main/Docs/references.md)** - Links to sources
 - **[Hardware](https://github.com/ShulcN/DroneModel/tree/main/Hardware)** - Connection diagrams, links to modules, and manuals
-- **[Matlab](https://github.com/ShulcN/DroneModel/tree/main/Matlab)** - Drone modeling files in Matlab
+- **[MathModels](https://github.com/ShulcN/DroneModel/tree/main/MathModels)** - Drone modeling files in Matlab
 - **[Software](https://github.com/ShulcN/DroneModel/tree/main/Software)** - Code for the drone
-- **[SolidWorks](https://github.com/ShulcN/DroneModel/tree/main/SolidWorks)** - Directory with 3D modeling files
+- **[CAD](https://github.com/ShulcN/DroneModel/tree/main/CAD)** - Directory with 3D modeling files
 
 ## Work Plan
 
