@@ -5,21 +5,17 @@
 
 ## Описание проекта
 
-Обязательная часть
-
 ### Обязательная часть
 
 - Создание модели бесколлекторного двигателя в Simulink
 - Создание модели квадрокоптера в Simulink
-- Создание электронной схемы
 - Написать минимальный код для дрона:
     - работа с моторами
     - работа с акселерометром
 - Создание 3д модели квадрокоптера
-- Печать и сборка
-- Решение задачи отсеивания шумов
-- Расчет регулятора для стабилизации дрона 
-- Программирование законов управление и отладка
+- сборка
+- Расчет и моделирование регулятора для стабилизации дрона и слежения за траекторией
+- Программирование управляющих законов и отладка
 
 
 ### Опциональная часть
@@ -28,16 +24,16 @@
 - Управление дроном посредством MQTT протокола
 - Поднять сервер для обмена сообщениями 
 - Подключение камеры
+- разработка электронной схемы
 ...
 
 ## Структура репозитория
 
 - **[Docs](https://github.com/ShulcN/DroneModel/tree/main/Docs)** - Директория с документацией
-    - **[references.md](https://github.com/ShulcN/DroneModel/tree/main/Docs/references.md)** - Ссылки на источники
 - **[Hardware](https://github.com/ShulcN/DroneModel/tree/main/Hardware)** - Схемы подключения, ссылки на модули и руководства
-- **[Matlab](https://github.com/ShulcN/DroneModel/tree/main/Matlab)** - Файлы моделирования дрона в среде Matlab
-- **[Software](https://github.com/ShulcN/DroneModel/tree/main/Software)** - Код для дрона
-- **[SolidWorks](https://github.com/ShulcN/DroneModel/tree/main/SolidWorks)** - директория с файлами 3d моделирования
+- **[MathModels](https://github.com/ShulcN/DroneModel/tree/main/MathModels)** - Файлы моделирования дрона в среде Matlab
+- **[Software](https://github.com/ShulcN/DroneModel/tree/main/Software)** - Программное обеспечение для дрона
+- **[CAD](https://github.com/ShulcN/DroneModel/tree/main/CAD)** - директория с файлами 3d моделирования
 
 
 ## План работ
