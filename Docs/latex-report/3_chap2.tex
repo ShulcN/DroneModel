@@ -1,7 +1,443 @@
-\chapter*{}
-\addcontentsline{toc}{chapter}{}
+\chapter{Обзор математической модели квадрокоптера}
+% \addcontentsline{toc}{chapter}{}
 \label{ch:chap2}
 
+\section{Описание модели}
 
+Квадрокоптер обладает шестью степенями свободы:
+
+\begin{itemize}
+    \item Линейные координаты $X, Y, Z$,
+    \item Угол крена \(\phi\) соответствует углу вращения вокруг оси \(X\). 
+    \item Угол тангажа \(\theta\) соответствует углу вращения вокруг оси \(Y\).
+    \item  Угол рыскания \(\psi\) соответствует углу вращения вокруг оси \(Z\).
+\end{itemize}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.8 \textwidth]{math-model.png}
+    \caption{Схематичное изображение квадрокоптера}
+\end{figure}
+
+\section{Локальная и глобальная системы координат}
+
+Для линейных координат рассмотрим переход системы координат от 
+глобальной \(X,Y,Z\) к системе координат связанной с квадрокоптером \(X_B,Y_B,Z_B\).
+
+Чтобы перейти к системе координат, связанной с центром масс квадрокоптера, необходимо 
+использовать матрицу поворота или, как её ещё называют матрицу косинусов.
+
+Эта матрица представляет собой перемноженные три матрицы, которые осуществляют 
+поворот вокруг оси \(X\), \(Y\) и \(Z\) соответственно по углам эйлера: \(\phi\), \(\theta\) и \(\psi\).
+
+Рассмотрим пример получения матрицы поворота вокруг оси \(X\). 
+При повороте вокруг оси \(X\) координата \(x\) не меняется.
+Рассмотрим проекцию на плоскость \(OYZ\), представленную на \hyperref[fig:point-rot]{рисунке \ref*{fig:point-rot-2}}.
+
+\begin{figure}[ht]
+    \centering
+    \hspace*{\fill}%
+    \begin{subfigure}[b]{0.49\textwidth}
+        \includegraphics[width=1 \textwidth]{point-rotation.png}
+        \caption{}
+        \label{fig:point-rot-1}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.49\textwidth}
+        \includegraphics[width=0.8 \textwidth]{point-rotation-2.png}
+        \caption{}
+        \label{fig:point-rot-2}
+    \end{subfigure}
+    \caption{Поворот точки вокруг оси. На рисунке (а) поворот точки в трёхмерном пространстве.
+    На рисунке (б) поворот точки в плоскости OYZ.}
+    \label{fig:point-rot}
+\end{figure}
+
+В проекции \(OYZ\) перейдем к полярным координатам: расстояние от начала координат \(r=\sqrt{y_1+z_1}\), начальный угол будет
+ \(\alpha_1=\arctan(\frac{y_1}{z_1})\).
+
+После поворота на угол \(\phi\) получим новый угол \(\alpha_2=\alpha_1+\phi\), а расстояние от начала координат не изменилось.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.5 \textwidth]{point-rotation-3.png}
+    \caption{Проекция на плоскость OYZ в полярных координатах}
+    \label{fig:point-rot-3}
+\end{figure}
+
+Выразим новые координаты \(y_2, z_2\) через расстояние от начала координат и угол \(\alpha_2\).
+Получим: \(y_2=r\cos(\alpha_2)\), \(z_2=r\sin(\alpha_2)\). Где \(\cos(\alpha_2)=\cos(\alpha_1+\phi)=\cos(\alpha_1)\cos(\phi)-\sin(\alpha_1)\sin(\phi)\) и \(\sin(\alpha_2)=\sin(\alpha_1)\cos(\phi)+\cos(\alpha_1)\sin(\phi)\).
+
+В итоге получаем следующую систему для перехода при повороте на угол \(\phi\) вокруг оси \(X\):
+\begin{equation}
+\begin{cases}
+    x_2 = x_1\\
+    y_2 = r (\cos(\alpha_1)\cos(\phi)-\sin(\alpha_1)\sin(\phi))\\
+    z_2 = r (\sin(\alpha_1)\cos(\phi)+\cos(\alpha_1)\sin(\phi))
+\end{cases}
+\end{equation}
+Заменим \(\cos(\alpha_1)=\frac{y_1}{r}\) и \(\sin(\alpha_1)=\frac{z_1}{r}\):
+\begin{equation}
+\begin{cases}
+    x_2 = x_1\\
+    y_2 = r \left(\frac{y_1}{r}\cos(\phi)-\frac{z_1}{r}\sin(\phi)\right)\\
+    z_2 = r \left(\frac{z_1}{r}\cos(\phi)+\frac{y_1}{r}\sin(\phi)\right)
+\end{cases}
+\end{equation}
+Упростим выражения:
+\begin{equation}
+\begin{cases}
+    x_2 = x_1\\
+    y_2 =  y_1 \cos(\phi)-z_1\sin(\phi)\\
+    z_2 = y_1\sin(\phi)+z_1 \cos(\phi)
+\end{cases}
+\end{equation}
+
+В матричном виде:
+
+\begin{equation}
+\begin{bmatrix}
+    x_2 \\ y_2 \\z_2
+\end{bmatrix} = 
+\begin{bmatrix}
+    1 & 0 & 0 \\
+    0 & \cos(\phi) & -\sin(\phi) \\
+    0 & \sin(\phi) & \cos(\phi)
+\end{bmatrix}
+\cdot
+\begin{bmatrix}
+    x_1 \\ y_1 \\z_1
+\end{bmatrix}
+\end{equation}
+
+Аналогичные матрицы поворота используются для поворота вокруг осей \(Y\) и \(Z\).
+
+\begin{equation}
+R_y(\theta) = \begin{bmatrix}
+    \cos(\theta) & 0 & \sin(\theta) \\
+    0 & 1 & 0 \\
+    -\sin(\theta) & 0 & \cos(\theta)
+\end{bmatrix} 
+\end{equation}
+
+\begin{equation}
+R_z(\psi) = \begin{bmatrix}
+    \cos(\psi) & -\sin(\psi) & 0 \\
+    \sin(\psi) & \cos(\psi) & 0 \\
+    0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+
+
+Матрица направляющих косинусов \(R\) получается путем перемножения матриц поворота вокруг осей \(Z, Y, X\):
+
+\begin{equation}
+R = R_z(\psi) \cdot R_y(\theta) \cdot R_x(\phi) =
+\begin{bmatrix}
+C_{\psi} C_{\theta} & C_{\psi} S_{\theta} S_{\phi} - S_{\psi} C_{\phi} & C_{\psi} S_{\theta} C_{\phi} + S_{\psi} S_{\phi} \\
+S_{\psi} C_{\theta} & S_{\psi} S_{\theta} S_{\phi} + C_{\psi} C_{\phi} & S_{\psi} S_{\theta} C_{\phi} - C_{\psi} S_{\phi} \\
+-S_{\theta} & C_{\theta} S_{\phi} & C_{\theta} C_{\phi} \\
+\end{bmatrix},
+\end{equation}
+
+где \( C - \cos\), \(S - \sin \). Матрица \(R\) позволяет перейти от глобальной к локальной системы координат, а чтобы
+осуществить обратное преобразование необходимо взять обратную матрицу \(R^{-1}\), но так как матрица \(R\) - 
+ортогональная, то \(R^{-1}=R^T\).
+
+\section{Поступательное и вращательное движение}
+
+В глобальной системе координат вводятся векторы линейных и угловых скоростей.
+
+\begin{equation}
+v = 
+\begin{bmatrix}
+    v_x \\ v_y \\ v_z
+\end{bmatrix}
+\omega = 
+\begin{bmatrix}
+    \omega_x \\ \omega_y \\ \omega_z
+\end{bmatrix},
+\end{equation}
+где \(v, \omega\) --- векторы линейных и угловых скоростей соответственно в локальной системе координат, а 
+\(v_x, v_y, v_z\) --- проекции линейных скоростей на соответствующие оси, 
+\( \omega_x, \omega_y, \omega_z\) --- угловые скорости вокруг соответствующих осей.
+
+\subsection{Поступательное движение и силы сопротивления}
+
+Поступательное движение квадрокоптера описывается с помощью уравнения Ньютона-Эйлера. 
+
+\begin{equation} m \ddot{r} = F_{\sum}, \end{equation}
+
+где \(m\) --- масса квадрокоптера, 
+\(r\) --- вектор положения центра масс, 
+\(F_{\sum}\) --- сумма сил, действующих на квадрокоптер.
+
+Квадрокоптер движется за счет силы тяги, которая создается при помощи электродвигателей, расположенных по углам рамы. Силу тяги можно представить 
+в следующем виде:
+
+\begin{equation}
+T = T_{1} + T_{2} + T_{3} + T_{4}
+\end{equation}
+\begin{equation}
+T_{i} = k_i \omega_i^2,
+\end{equation}
+
+где \(T\) --- суммарная сила тяги, которая направлена вдоль оси \(OZ\), поэтому представляет собой вектор \(\begin{bmatrix}
+    0 & 0 & T
+\end{bmatrix}^T\). \(T_i\) --- сила тяги отдельного электродвигателя с пропеллером.
+\(k\) --- коэффициент тяги, который можно определить экспериментально, из данных об электродвигателе и пропеллерах или 
+рассчитать приблизительное значение по формуле, предложенной в \cite{Lysukho}  \(k_i=\frac{1}{2}\rho C_{\gamma} S_{prop_i} r_{prop_i}^2\),
+где \(\rho\) --- плотность воздуха, \(C_{\gamma}\) --- коэффициент подъемной силы, \(S_{prop_i}\) --- площадь окружности,
+которую описывает винт радиусом \(r_{prop_i}\).
+
+
+Также на квадрокоптер
+действует сила тяжести и аэродинамические силы. Аэродинамические силы включают в себя флаттер лопастей, индуктивное сопротивление 
+и лобовое сопротивление. 
+
+Флаттер лопастей - это явление, возникающее из-за прогиба лопастей пропеллера при движения
+квадрокоптера вперед. Лопасти, движущиеся вперед, создают больше подъемной силы, чем лопасти,
+движущиеся назад, что приводит к наклону подъемной силы и созданию силы сопротивления. В 
+статье [1] представлено моделирование лопастного флаттера следующим образом:
+
+\begin{equation}
+F_{flap} = -T A_{flap} v,
+\end{equation}
+
+где \(A_{flap}\) --- матрица флаттера, равная:
+
+\begin{equation}
+A_{flap} = \begin{bmatrix}
+    c_a & -c_b & 0 \\
+    c_b & c_a & 0 \\
+    0 & 0 & 0 \\
+\end{bmatrix},
+\end{equation}
+
+где \(c_a\) и \(c_b\) --- коэффициенты флаттера. Однако коэффициент \(c_b\) связан с поперечным флаттером 
+лопастей, поэтому им можно пренебречь, так как продольный флаттер намного больше, чем поперечный. 
+
+Индуктивное сопротивление --- это сопротивление, вызванное вихрями на торцах пропеллеров. Вихри 
+образуются перетеканием воздуха из области под лопастью в область над лопастью.
+
+\begin{equation}
+F_{ind} = -T A_{ind} v,
+\end{equation}
+
+где \(A_{ind}=diag(c_{dx}, c_{dy}, 0)\), \(c_{dx}, c_{dy}\) - коэффициенты индуктивного сопротивления. Однако в силу 
+симметричности квадрокоптера можно принять, что \(c_{dx}=c_{dy}=c_{d}\)
+
+
+Лобовое сопротивление --- это сопротивление, вызванное трением воздуха о поверхность квадрокоптера.
+Лобовое сопротивление будем учитывать, используя стандартное выражение для расчета сопротивления
+\begin{equation}
+F_{drag} = - \frac{1}{2} \rho  C_{drag} S \| r \| r,
+\end{equation}
+
+\(C_{drag}\) --- коэффициент сопротивления, \(S\) --- характерная площадь поверхности квадрокоптера.
+\(\| v \|= \sqrt{r_x^2 + r_y^2 + r_z^2}\)
+
+Сумма всех сил действующих на квадрокоптер в глобальной системе координат с учетом силы тяжести, которая
+действует вдоль оси \(OZ\), будет выглядеть следующим образом:
+
+\begin{equation}
+m \ddot{r} =
+T R - m \begin{bmatrix} 0 \\ 0 \\ g \end{bmatrix} + F_{flap} + F_{ind} + F_{drag}
+\end{equation}
+
+\begin{equation}
+m \ddot{r} =
+T R - m \begin{bmatrix} 0 \\ 0 \\ g \end{bmatrix} - T R A_{ind} R_T \dot{r} - T R A_{flap} R_T \dot{r} -  \frac{1}{2} \rho C_{drag} S \sqrt{v_x^2 + v_y^2 + v_z^2} \dot{r}
+\end{equation}
+
+Из этого уравнения можно получить систему уравнений для выражения положения квадрокоптера в глобальной системе координат:
+
+\begin{equation}
+\begin{cases}
+    \ddot{r}_x = \frac{T \cos\theta \cos\psi - T (R A_{ind} R^T \dot{r})_x - T (R A_{flap} R^T \dot{r})_x - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_x}{m} \\
+    \ddot{r}_y = \frac{T \cos\theta \sin\psi - T (R A_{ind} R^T \dot{r})_y - T (R A_{flap} R^T \dot{r})_y - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_y}{m} \\
+    \ddot{r}_z = \frac{-T \sin\theta - T (R A_{ind} R^T \dot{r})_z - T (R A_{flap} R^T \dot{r})_z - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_z}{m} - g
+\end{cases}
+\end{equation}
+
+\subsection{Вращательное движение}
+
+Для перевода угловых скоростей из глобальной системы координат в локальной  
+нужно ввести матрицу \(W\). Для вывода этой матрицы последовательно рассмотрим поворот вдоль каждой оси.
+Также, как и в случае с матрицей поворота используется стандартная последовательность вращений: сначала вокруг оси
+\(Z\), затем вокруг оси \(Y\) и затем вокруг оси \(X\).
+
+Пусть исходная система координат, совпадающая с глобальной будет \(X_0, Y_0, Z_0\), соответственно, 
+после первого поворота на угол \(\psi\) система координат будет \(X_1, Y_1, Z_1\), после второго поворота
+на угол \(\theta\) система координат будет \(X_2, Y_2, Z_2\) и после третьего поворота на угол \(\phi\)
+система координат будет \(X_3, Y_3, Z_3\).
+
+Локальной системой координат является \(X_3, Y_3, Z_3\), в которой угловые скорости будут производными по
+соответствующим углам Эйлера, однако угловые скорости \(\dot{\theta}\) и \(\dot{\psi}\) необходимо привести к 
+локальной системе координат, так как они выполняются в других системах координат: \(X_2, Y_2, Z_2\) и \(X_1, Y_1, Z_1\).
+Чтобы получить угловую скорость вокруг оси \(Y_3\) нужно привести систему координат в состояние до поворота на угол \(\phi\),
+соответственно умножить вектор угловой скорости на матрицу поворота \(R_x(\phi)^{-1}=R_x(-\phi)\), аналогично для получения
+угловой скорости вокруг оси \(Z_3\) необходимо также привести систему координат до поворота на угол \(\theta\) умножив на матрицу \(R_y(-\theta)\).
+
+Угловая скорость \(\omega\) в локальной системе по компонентам:
+
+\begin{equation}
+\omega_{\phi}=
+\begin{bmatrix}
+    \dot{\phi} \\
+    0 \\
+    0
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+\omega_{\theta}=
+R_x({-\phi}) \begin{bmatrix}
+    0 \\
+    \dot{\theta} \\
+    0
+    \end{bmatrix}=
+    \dot{\theta}
+    \begin{bmatrix}
+        0 \\
+        \cos \phi \\
+        -\sin \phi
+    \end{bmatrix}
+\end{equation}
+
+\begin{equation}
+\omega_{\psi}=
+R_x({-\phi}) R_y({-\theta}) \begin{bmatrix}
+    0 \\
+    0 \\
+    \dot{\psi}
+    \end{bmatrix}=
+    \dot{\psi}
+    \begin{bmatrix}
+        -\sin \theta \\
+        \sin \phi \cos \theta \\
+        \cos \phi \cos \theta
+    \end{bmatrix}
+\end{equation}
+
+
+Вектор угловой скорости в локальной системе координат \(\omega=\omega_x+\omega_y+\omega_z\):
+
+\begin{equation}
+\omega=
+\begin{bmatrix}
+    1 & 0 & -\sin\theta \\
+    0 & \cos\phi & \sin\phi\cos\theta \\
+    0 &  -\sin\phi & \cos\phi\cos\theta
+\end{bmatrix}
+\cdot
+\begin{bmatrix}
+    \dot{\phi} \\
+    \dot{\theta} \\
+    \dot{\psi}
+\end{bmatrix}
+\end{equation}
+
+
+Для перевода из локальной в глобальную \(W^{-1}\)
+
+\begin{equation}
+W^{-1} = \begin{bmatrix}
+1 & \tan\theta \sin\phi & \tan\theta \cos\phi \\
+0 & \cos\phi & -\sin\phi \\
+0 & \frac{\sin\phi}{\cos\theta} & \frac{\cos\phi}{\cos\theta}
+\end{bmatrix}.
+\end{equation}
+
+\subsection{Крутящие моменты}
+
+Маневрирование квадрокоптера осуществляется за счет создания крутящих моментов. 
+Крутящие моменты можно вычислить следующим образом:
+
+\begin{equation}
+\begin{cases}
+    \tau_{\phi} = \tau_{q\phi} + \tau_{m\phi} + \tau_{p\phi}\\
+    \tau_{\theta} = \tau_{q\theta} + \tau_{m\theta} + \tau_{p\theta}\\
+    \tau_{\psi} = \tau_{q\psi},
+\end{cases}
+\end{equation}
+
+где \(M_{q\phi}, M_{q\theta}, M_{q\psi}\) - моменты, создаваемые разницей сил тяги, которые создаются парами винтов.
+Момент \(M_{m\phi}, M_{m\theta}\) - гироскопические моменты двигателей, \(M_{p\phi}, M_{p\theta}\)
+ - гироскопические моменты винтов. Эти моменты могут быть выражены следующим образом:
+
+\begin{equation}
+\tau_{q\phi} = (T_3 - T_1)l
+\end{equation}
+\begin{equation}
+\tau_{q\theta} = (T_2 - T_4)l 
+\end{equation} 
+\begin{equation}
+\tau_{q\psi} = (T_2 + T_4 - T_1 - T_3)
+\end{equation} 
+\begin{equation}
+\tau_{m\phi} = I_m \omega_{\theta}(\omega_1+\omega_3-\omega_2-\omega_4)
+\end{equation} 
+\begin{equation}
+\tau_{m\theta} = I_m \omega_{\phi}(\omega_2+\omega_4-\omega_1-\omega_3)
+\end{equation} 
+\begin{equation}
+\tau_{p\phi} = I_p \omega_{\theta}(\omega_1+\omega_3-\omega_2-\omega_4)
+\end{equation} 
+\begin{equation}
+\tau_{p\theta} = I_p \omega_{\phi}(\omega_2+\omega_4-\omega_1-\omega_3)
+\end{equation} 
+
+Однако значения гироскопических моментов мало, поэтому ими можно пренебречь.
+Для вращательного движения второй закон Ньютона будет выглядеть следующим образом:
+
+\begin{equation}
+I\dot{\omega}+\omega \times (I \omega) = \tau,
+\end{equation}
+
+где \(I=diag(I_{x}, I_{y}, I_{z})\) - это матрица инерции квадрокоптера, \(\omega \times (I \omega)\) - описывает гироскопические силы, которые возникают при вращении квадрокоптера.
+
+\begin{equation}
+\begin{cases}
+    \tau_{\phi} =  I_{x} \dot{\omega}_{\phi} + (I_z-I_y) \omega_{\theta} \omega_{\psi} \\
+    \tau_{\theta} = I_{y} \dot{\omega}_{\theta} + (I_x-I_z) \omega_{\phi} \omega_{\psi} \\
+    \tau_{\psi} = I_{z} \dot{\omega}_{\psi} + (I_y-I_x) \omega_{\phi} \omega_{\theta} 
+\end{cases}
+\end{equation}
+
+Из этой системы уравнений можно выразить угловые ускорения в локальной системе координат:
+
+\begin{equation}
+\begin{cases}
+    \dot{\omega}_{\phi} = \frac{\tau_{\phi}+(I_z-I_y) \omega_{\theta} \omega_{\psi}}{I_{x}} \\
+    \dot{\omega}_{\theta} = \frac{\tau_{\theta}+(I_x-I_z) \omega_{\phi} \omega_{\psi}}{I_{y}} \\
+    \dot{\omega}_{\psi} = \frac{\tau_{\psi}+(I_y-I_x) \omega_{\phi} \omega_{\theta}}{I_{z}}
+\end{cases}
+\end{equation}
+
+\section{Итоговая система уравнений динамики квадрокоптера}
+
+Таким образом, итоговая система уравнений динамики квадрокоптера будет выглядеть следующим образом:
+
+\begin{equation}
+\begin{cases}
+    \ddot{r}_x = \frac{T \cos\theta \cos\psi - T (R A_{ind} R^T \dot{r})_x - T (R A_{flap} R^T \dot{r})_x - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_x}{m} \\
+    \ddot{r}_y = \frac{T \cos\theta \sin\psi - T (R A_{ind} R^T \dot{r})_y - T (R A_{flap} R^T \dot{r})_y - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_y}{m} \\
+    \ddot{r}_z = \frac{-T \sin\theta - T (R A_{ind} R^T \dot{r})_z - T (R A_{flap} R^T \dot{r})_z - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_z}{m} - g \\
+    \dot{\phi} = \omega_{\phi} + \tan\theta (\omega_{\theta} \sin\phi + \omega_{\psi} \cos\phi) \\
+    \dot{\theta} = \omega_{\theta} \cos\phi - \omega_{\psi} \sin\phi \\
+    \dot{\psi} = \frac{\sin\phi}{\cos\theta} \omega_{\theta} + \frac{\cos\phi}{\cos\theta} \omega_{\psi} \\
+    \dot{\omega}_{\phi} = \frac{\tau_{\phi}+(I_z-I_y) \omega_{\theta} \omega_{\psi}}{I_{x}} \\
+    \dot{\omega}_{\theta} = \frac{\tau_{\theta}+(I_x-I_z) \omega_{\phi} \omega_{\psi}}{I_{y}} \\
+    \dot{\omega}_{\psi} = \frac{\tau_{\psi}+(I_y-I_x) \omega_{\phi} \omega_{\theta}}{I_{z}} \\
+\end{cases}
+\label{eq:system}
+\end{equation}
+
+В данной модели представлены динамические уравнения описывающие поступательное и вращательное 
+движение квадрокоптера. Управление квадрокоптером осуществляется за счет изменения скорости 
+вращения четырех электродвигателей, которые создают тягу. Соответственно, меняя соотношения скоростей
+вращения электродвигателей, можно менять положение квадрокоптера в пространстве по 6 степеням свободы. Однако
+для корректного управления с качественно хорошими переходными процессами необходимо синтезировать 
+сложные системы управления.
 
 \endinput
