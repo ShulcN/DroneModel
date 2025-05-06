@@ -1,0 +1,66 @@
+function nlobj = init_nmpc()
+    % === Параметры модели ===
+    nx = 12;     % Число состояний
+    ny = 3;      % Число выходов (например, только позиции)
+    nu = 4;      % Число управляющих воздействий
+    Ts = 0.05;   % Дискретизация (dt), секунд
+    PredictionHorizon = 20;   % Горизонт предсказания
+    ControlHorizon = 8;       % Горизонт управления
+
+    % === Создание NMPC объекта ===
+    nlobj = nlmpc(nx, ny, nu);
+    nlobj.Ts = Ts;
+    nlobj.PredictionHorizon = PredictionHorizon;
+    nlobj.ControlHorizon = ControlHorizon;
+
+    % === Границы на входы ===
+    % Можно адаптировать под реальные ограничения
+    nlobj.MV(1).Min = 5;      % thrust T
+    nlobj.MV(1).Max = 10;
+    nlobj.MV(2).Min = -0.2*2;     % tau_phi
+    nlobj.MV(2).Max = 0.2*2;
+    nlobj.MV(3).Min = -0.2*2;     % tau_theta
+    nlobj.MV(3).Max = 0.2*2;
+    nlobj.MV(4).Min = -0.2*2;     % tau_psi
+    nlobj.MV(4).Max = 0.2*2;
+    
+    % nlobj.OV(4).Min = -1/2;
+    % nlobj.OV(5).Min = -1;
+    % nlobj.OV(6).Min = -1;
+    % nlobj.OV(4).Max = 1/2;
+    % nlobj.OV(5).Max = 1;
+    % nlobj.OV(6).Max = 1;
+    % 
+    % nlobj.OV(10).Min = -1;
+    % nlobj.OV(11).Min = -1;
+    % nlobj.OV(12).Min = -1;
+    % nlobj.OV(10).Max = 1;
+    % nlobj.OV(11).Max = 1;
+    % nlobj.OV(12).Max = 1;
+
+    % nlobj.OV(4).Min = -pi/6;  % Ограничение на phi
+    % nlobj.OV(4).Max =  pi/6;
+    % 
+    % nlobj.OV(5).Min = -pi/6;  % Ограничение на theta
+    % nlobj.OV(5).Max =  pi/6;
+
+    % === Функция динамики ===
+    nlobj.Model.StateFcn = @(x,u) dynamics_discrete_2(x, u, Ts);
+    nlobj.Model.IsContinuousTime = false;
+    nlobj.Model.NumberOfParameters = 0; % структура параметров p
+
+    % === Функция выходов (если только позиция) ===
+    % nlobj.Model.OutputFcn = @(x, u) [x(1:3); x(7:9)];
+    nlobj.Model.OutputFcn = @(x, u) [x(1:3)];
+
+    % === Настройка весов (опционально) ===
+    %nlobj.Weights.OutputVariables = [1 1 0.1 0.1 0.1 0.1 1 1 1 0.1 0.1 0.1];    % веса для rx, ry, rz
+    nlobj.Weights.OutputVariables = [10 10 10];
+    nlobj.Weights.ManipulatedVariablesRate = [0.5 0.1 0.1 0.1];
+
+    % === Проверка ===
+    x0 = zeros(nx,1);
+    u0 = zeros(nu,1);
+    % p = struct('m',1,'g',9.81,'Ix',0.02,'Iy',0.02,'Iz',0.04);
+    validateFcns(nlobj, x0, u0, [], {});
+end

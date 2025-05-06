@@ -1,0 +1,111 @@
+function initQuadrotorData(c_a, c_b, c_d, C_drag)
+    % Все твои переменные и вычисления
+    m=0.65;
+    a=0.07;
+    b=0.07;
+    l=0.15;
+    c=0.02;
+    g=9.8;
+    maxDroneSpeed=40;
+    maxMotorSpeed=8450/60*2*pi;
+    R=165/1000;
+    Ke=11/maxMotorSpeed;
+    Km=Ke;
+    Imot=16;
+    J = 2.5*10^(-6);
+    B = 1*10^(-5);
+    La = 100*10^(-6);
+    ra = 0.058;
+    ke = 0.00734;
+    kt = ke;
+    demp = 0;
+    R=ra;
+    Ke=ke;
+    Km=kt;
+    L = La;
+
+    rho = 1.225;
+    A_flap = [c_a, c_b, 0;
+              -c_b, c_a, 0;
+              0, 0, 0];
+    A_ind = [c_d, 0, 0;
+               0, c_d, 0;
+               0, 0, 0];
+
+    Sblade=0.00525;
+    airDensity=1.225;
+    ks=1;
+    r=0.07;
+
+    maxU=16;
+    S=l*c*4+a*b;
+    kf=ks*r^2*airDensity*Sblade/2;
+    maxAirResistance=airDensity*maxDroneSpeed^2*S*0.5/2;
+    Ip=(1.8*r)^2*0.015/12;
+    Im=0.0135^2*0.045/2;
+    Ix=m/3*a^2/12+2*0.045*l^2;
+    Iy=m/3*a^2/12+2*0.045*l^2;
+    Iz=m/3*a^2/4+4*0.045*l^2;
+
+    Adrag = -1/m * (A_ind + A_flap);
+
+    A = zeros(12);
+    A(1:3, 4:6) = eye(3);
+    A(4:6, 4:6) = Adrag;
+    A(7:9, 10:12) = eye(3);
+    A(4, 8) = g;
+    A(5, 7) = -g;
+
+    B = zeros(12,4);
+    B(6, 1) = 1/m;
+    B(10, 2) = 1/Ix;
+    B(11, 3) = 1/Iy;
+    B(12, 4) = 1/Iz;
+
+    kv = 1300;
+
+    params = struct();
+    params.N = 10;
+    params.dt = 0.05;
+    params.alpha = 0.1;
+    params.max_iters = 10;
+    params.m = m;
+    params.g = g;
+    params.Ix = Ix;
+    params.Iy = Iy;
+    params.Iz = Iz;
+    params.umin = [0; -0.1; -0.1; -0.1];
+    params.umax = [15; 1; 1; 11];
+
+    u_nominal = [m*g; 0; 0; 0];
+    U_ref  = repmat(u_nominal', params.N, 1);
+
+    N = params.N;
+
+    % Сохраняем нужные переменные в base workspace
+    assignin('base', 'A', A);
+    assignin('base', 'B', B);
+    assignin('base', 'params', params);
+    assignin('base', 'kf', kf);
+    assignin('base', 'Ix', Ix);
+    assignin('base', 'Iy', Iy);
+    assignin('base', 'Iz', Iz);
+    assignin('base', 'u_nominal', u_nominal);
+    assignin('base', 'U_ref', U_ref);
+    assignin('base', 'N', N);
+    assignin('base', 'kv', kv);
+    assignin('base', 'maxU', maxU);
+    assignin('base', 'Ke', Ke);
+    assignin('base', 'Km', Km);
+    assignin('base', 'J', J);
+    assignin('base', 'N', N);
+    assignin('base', 'R', R);
+    assignin('base', 'm', m);
+    assignin('base', 'g', g);
+    assignin('base', 'l', l);
+    assignin('base', 'rho', rho);
+    assignin('base', 'S', S);
+    assignin('base', 'A_ind', A_ind);
+    assignin('base', 'A_flap', A_flap);
+    assignin('base', 'Adrag', Adrag);
+end
