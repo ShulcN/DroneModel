@@ -1,11 +1,451 @@
-\chapter{}
+\chapter{Разработка алгоритмов управления}
 \label{ch:chap2}
 
-\section{Условие задания}
-\label{sec:cond2}
+\section{LQR регулятор по линеаризованной модели}
 
-\section{Расчеты}
-\label{sec:calc2}
+В качестве одного из базовых регуляторов можно использовать LQR регулятор по линеаризованной модели.
+Для синтеза регулятора определим модель системы в форме вход-состояние-выход. 
+
+Необходимо осуществлять управление по координатам \(r_x\), \(r_y\), \(r_z\) в соответствии с этим вектор
+выхода системы будет выглядеть следующим образом:
+
+\begin{equation}
+Y = \begin{bmatrix}
+    r_x \\
+    r_y \\
+    r_z
+\end{bmatrix}.
+\end{equation}
+
+
+Система \eqref{eq:system} в матричном виде вход-состояние-выход будет выглядеть следующим образом:
+
+
+\begin{equation}
+    \begin{cases}
+        \dot{X} = A X + B U + D;\\
+        Y = C X.
+    \end{cases}
+\end{equation}
+
+
+Вектор состояния расширен, добавлением положением по координатам \(r_x\), \(r_y\) и \(r_z\).
+
+\begin{equation}
+X = \begin{bmatrix} 
+    r_x & 
+    r_y & 
+    r_z & 
+    \dot{r}_x & 
+    \dot{r}_y & 
+    \dot{r}_z & 
+    \phi &
+    \theta & 
+    \psi &
+    \omega_{\phi} & 
+    \omega_{\theta} & 
+    \omega_{\psi} 
+\end{bmatrix}^T.
+\end{equation}
+
+Вектор управления:
+
+\begin{equation}
+U = \begin{bmatrix}
+    T \\
+    \tau_\phi \\
+    \tau_\theta \\
+    \tau_\psi
+\end{bmatrix}.
+\end{equation}
+
+\newpage
+Матрица \(A\) будет выглядеть следующим образом:
+
+\begin{equation}
+    A=
+\begin{bmatrix}
+    0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & A_{drag_{1:1}} & A_{drag_{1:2}} & A_{drag_{1:3}} & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & A_{drag_{2:1}} & A_{drag_{2:2}} & A_{drag_{2:3}} & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & A_{drag_{3:1}} & A_{drag_{3:2}} & A_{drag_{3:3}} & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 1 & T_\theta S_\phi & T_\theta C_\phi & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & C_\phi & -S_\phi & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & \frac{S_\phi}{C_\theta} & \frac{C_\phi}{C_\theta} & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & \frac{(I_z - I_y)\omega_{\theta}}{I_x} \\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & \frac{(I_x - I_z)\omega_{\phi}}{I_y} \\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & \frac{(I_y - I_x)\omega_{\phi}}{I_z} & 0
+\end{bmatrix},
+\end{equation}
+
+
+где \(C_\phi = \cos\phi\), \(S_\phi = \sin\phi\), \(C_\theta = \cos\theta\), \(S_\theta = \sin\theta\),
+\(T_\theta = \tan\theta\), матрица \(A_{drag}\):
+
+\begin{equation}
+A_{drag} = -\frac{T}{m} R (A_{ind} + A_{flap}) R^T - \frac{\rho C_{drag} S}{2m} \|\dot{r}\| I
+.\end{equation}
+
+Матрица \(B\):
+
+\begin{equation}
+B = \begin{bmatrix}
+    0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 \\
+    \frac{\cos \psi \sin \theta \cos \phi + \sin \psi \sin \phi}{m} & 0 & 0 & 0 \\
+    \frac{\sin \psi \sin \theta \cos \phi - \cos \psi \sin \phi}{m} & 0 & 0 & 0 \\
+    \frac{\cos\theta\cos\phi}{m} & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 \\
+    0 & \frac{1}{I_x} & 0 & 0 \\
+    0 & 0 & \frac{1}{I_y} & 0 \\
+    0 & 0 & 0 & \frac{1}{I_z} \\
+    \end{bmatrix}.
+\end{equation}
+
+\newpage
+
+Матрица \(D\)
+
+\begin{equation}
+D = \begin{bmatrix}
+    0 & 0 & 0 & 0 & 0 & -g & 0 & 0 & 0 & 0 & 0 & 0 \\
+\end{bmatrix}^T.
+\end{equation}
+
+Матрица \(C\):
+
+\begin{equation}
+C = \begin{bmatrix}
+    1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 
+\end{bmatrix}.
+\end{equation}
+
+\subsection{Линеаризация у точки равновесия}
+
+Для синтеза LQR регулятора необходимо сначала линеаризовать квадрокоптер.
+
+Производится линеаризация около точки равновесия, в которой угловые 
+скорости и ускорения равны нулю. Состояние системы, которое будет соответствовать точке 
+равновесия будет определяться следующим образом:
+
+\begin{equation}
+    \bar{X} = \begin{bmatrix}
+        \bar{r}_x & \bar{r}_y & \bar{r}_z & 0 & 0 & 0 & 0 & 0 & \psi & 0 & 0 & 0 
+    \end{bmatrix}.
+    \label{eq:point1}
+\end{equation}
+
+Линеаризация системы у точки \eqref{eq:point1}:
+
+
+\begin{equation}
+    \bar{A} = 
+    \begin{bmatrix}
+    0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & \bar{A}_{drag_{1:1}} & \bar{A}_{drag_{1:2}} & \bar{A}_{drag_{1:3}} & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & \bar{A}_{drag_{2:1}} & \bar{A}_{drag_{2:2}} & \bar{A}_{drag_{2:3}} & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & \bar{A}_{drag_{3:1}} & \bar{A}_{drag_{3:2}} & \bar{A}_{drag_{3:3}} & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0
+\end{bmatrix},
+\end{equation}
+
+где  
+
+\begin{equation}
+    \bar{A}_{drag} = - \frac{T}{m} (A_{ind} + A_{flap});
+\end{equation}
+
+
+\begin{equation}
+    \bar{B} = \begin{bmatrix}
+    0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 \\
+    \frac{1}{m} & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 \\
+    0 & \frac{1}{I_x} & 0 & 0 \\
+    0 & 0 & \frac{1}{I_y} & 0 \\
+    0 & 0 & 0 & \frac{1}{I_z} \\
+    \end{bmatrix}.
+\end{equation}
+
+Матрицы \(C\) и \(D\) остаются без изменений.
+
+LQR регулятор минимизирует критерий качества, который определяется как:
+
+\begin{equation}
+    J = \int_0^\infty \left( X^T Q X + U^T R U \right) dt.
+\end{equation}
+
+Для синтеза LQR регулятора необходимо определить матрицы \(Q\) и \(R\), которые определяют весовые коэффициенты для состояния и 
+управления соответственно.
+Пусть \(Q\) и \(R\) будут определены следующим образом:
+
+\[
+    Q = \begin{bmatrix}
+        10 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\ %1
+        0 & 10 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\ %2
+        0 & 0 & 30 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\ %3
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\ %4
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\ %5
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\ %6
+        0 & 0 & 0 & 0 & 0 & 0 & 10 & 0 & 0 & 0 & 0 & 0 \\ %7
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 10 & 0 & 0 & 0 & 0 \\ %8
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 10 & 0 & 0 & 0 \\ %9
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\    %10
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\    %11
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\    %12
+    \end{bmatrix};
+\]
+
+\[
+    R = \begin{bmatrix}
+        1 & 0 & 0 & 0  \\ %1
+        0 & 1 & 0 & 0 \\ %2
+        0 & 0 & 1 & 0  \\ %3
+        0 & 0 & 0 & 1
+    \end{bmatrix}.
+\]
+
+
+Для обеспечения минимизации критерия качества \(J\) используется решение уравнения Риккати:
+
+\begin{equation} 
+    A^T P + P A - P B R^{-1} B^T P + Q = 0.
+\end{equation}
+
+Из этого уравнения можно получить \(P\) — матрица, с помощью которой можно найти матрицу \(K\) для LQR регулятора:
+
+\begin{equation}
+    K = R^{-1} B^T P.
+\end{equation} 
+
+Управление в системе будет осуществляться по следующему закону:
+\begin{equation}
+    U = -K X.
+\end{equation}
+
+Рассчитанные коэффициенты:
+
+\[
+    K =\begin{bmatrix}
+        0 & 0 & 5.48 & 0 & 0 & 2.67 & 0 & 0 & 0 & 0 & 0 & 0 \\
+        0 & -3.16 & 0 & 0 & -1.54 & 0 & 3.69 & 0 & 0 & 0.13 & 0 & 0 \\
+        3.16 & 0 & 0 & 1.54 & 0 & 0 & 0 & 3.69 & 0 & 0 & 0.13 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 3.16 & 0 & 0 & 0.17
+        \end{bmatrix}.
+\]
+
+
+\section{LQR регулятор с линеаризацией обратной связью}
+
+В линеаризации обратной связью необходимо упростить уравнения квадрокоптера вводом 
+новых виртуальных управлений. Управления будут выглядеть следующим образом:
+
+% Без сопротивлений
+
+\begin{equation}
+    \begin{cases}
+        \nu_x = \frac{1}{m} (\cos\phi \sin\theta  + \sin\psi \sin\phi) U_1;\\
+        \nu_y = \frac{1}{m} (\sin\psi \sin\theta \cos\phi - \cos\psi \sin\phi) U_1;\\
+        \nu_z = -g + \frac{1}{m} \cos\theta \cos\phi U_1;\\
+        \nu_\phi = \frac{I_z - I_y}{I_x}\omega_\psi \omega_\theta + \frac{1}{I_x} U_2;\\
+        \nu_\theta = \frac{I_x - I_z}{I_y}\omega_\phi \omega_\psi + \frac{1}{I_y} U_2;\\
+        \nu_\psi = \frac{I_y - I_x}{I_z}\omega_\phi \omega_\theta + \frac{1}{I_z} U_2.
+    \end{cases}
+\end{equation}
+
+Введение ошибок состояния:
+
+\begin{equation}
+\begin{aligned}
+&\tilde{r}_x = r_x - r_x^d; \quad \tilde{v}_x = v_x - v_x^d; \\
+&\tilde{r}_y = r_y - r_y^d; \quad \tilde{v}_y = v_y - v_y^d; \\
+&\tilde{r}_z = r_z - r_z^d; \quad \tilde{v}_z = v_z - v_z^d; \\
+&\tilde{\phi} = \phi - \phi^d; \quad \tilde{\omega}_\phi = \omega_\phi - \omega_\phi^d; \\
+&\tilde{\theta} = \theta - \theta^d; \quad \tilde{\omega}_\theta = \omega_\theta - \omega_\theta^d; \\
+&\tilde{\psi} = \psi - \psi^d; \quad \tilde{\omega}_\psi = \omega_\psi - \omega_\psi^d.
+\end{aligned}
+\end{equation}  
+
+Динамика ошибок преобразуется в линейные подсистемы:  
+\begin{equation}
+\begin{cases} 
+\dot{\tilde{r}}_x = \tilde{v}_x; \\
+\dot{\tilde{v}}_x = \nu_x;
+\end{cases}
+\quad
+\begin{cases} 
+\dot{\tilde{r}}_y = \tilde{v}_y; \\
+\dot{\tilde{v}}_y = \nu_y;
+\end{cases}
+\quad
+\begin{cases} 
+\dot{\tilde{r}}_z = \tilde{v}_z; \\
+\dot{\tilde{v}}_z = \nu_z;
+\end{cases}
+\end{equation}
+ 
+\begin{equation}
+\begin{cases} 
+\dot{\tilde{\phi}} = \tilde{\omega}_\phi; \\
+\dot{\tilde{\omega}}_\phi = \nu_\phi;
+\end{cases}
+\quad
+\begin{cases} 
+\dot{\tilde{\theta}} = \tilde{\omega}_\theta; \\
+\dot{\tilde{\omega}}_\theta = \nu_\theta;
+\end{cases}
+\quad
+\begin{cases} 
+\dot{\tilde{\psi}} = \tilde{\omega}_\psi; \\
+\dot{\tilde{\omega}}_\psi = \nu_\psi.
+\end{cases}
+\end{equation}
+
+
+Для каждой подсистемы применяется LQR регулятор:
+
+\begin{equation}
+    \begin{cases}
+    \nu_x = -k_1^x \tilde{r}_x - k_2^x \tilde{v}_x; \\
+    \nu_y = -k_1^y \tilde{r}_y - k_2^y \tilde{v}_y; \\
+    \nu_z = -k_1^z \tilde{r}_z - k_2^z \tilde{v}_z; \\
+    \nu_\phi = -k_1^\phi \tilde{\phi} - k_2^\phi \tilde{\omega}_\phi; \\
+    \nu_\theta = -k_1^\theta \tilde{\theta} - k_2^\theta \tilde{\omega}_\theta; \\
+    \nu_\psi = -k_1^\psi \tilde{\psi} - k_2^\psi \tilde{\omega}_\psi.
+    \end{cases}
+\end{equation}
+
+Для подсистеме по координате \(r_x\) синтез LQR регулятор выглядит следующим образом:
+Матрицы состояния и управления:
+
+\begin{equation}
+    A_x=\begin{bmatrix}
+    0 & 1 \\
+    0 & 0
+\end{bmatrix}, \quad
+B_x = \begin{bmatrix}
+    0 \\
+    1
+\end{bmatrix}.\end{equation}
+
+Осуществляется выбор матриц \(Q\) и \(R\) для критерия качества. 
+И решается уравнение Риккати:
+
+\begin{equation}
+    A_x^T P + P A_x - P B_x R^{-1} B_x^T P + Q = 0.
+\end{equation}
+
+Откуда получаем коэффициенты \(k_1^x\) и \(k_2^x\):
+\begin{equation}
+    k^x = R^{-1} B_x^T P.
+\end{equation}
+
+Аналогично синтезируются регуляторы для остальных подсистем.
+
+Полученные виртуальные управления обратно преобразуются в реальные управления:
+
+\begin{equation}
+    \begin{cases}
+        \bar{\phi} = \frac{v_x}{v_z+g};\\
+        \bar{\theta} =  \frac{v_y}{v_z+g};
+    \end{cases}
+\end{equation}
+
+\begin{equation}
+    \begin{cases}
+    U_1 = \frac{m (\nu_z + g)}{\cos\bar{\phi} \cos\bar{\theta}}; \\
+    U_2 = I_x \nu_\phi - (I_y - I_z) \omega_\theta \omega_\psi; \\
+    U_2 = I_y \nu_\theta - (I_x - I_z) \omega_\phi \omega_\psi; \\
+    U_4 = I_z \nu_\psi - (I_x - I_y) \omega_\phi \omega_\theta.
+    \end{cases}
+\end{equation}
+% С сопротивлениями
+Для управлений были выбраны различные матрицы \(Q\) и \(R\), полученные коэффициенты регулятора:
+
+\[
+K = \begin{bmatrix}
+    5  & 5  &  3  & 141 & 141 & 0 \\
+    10 & 10 &  3  & 1000 & 1000 & 0 
+\end{bmatrix}^T.
+\]
+
+
+\section{Nonlinear MPC}
+
+Nonlinear MPC --- один из самых эффективных регуляторов с точки зрения оптимизации управления и 
+точности. Суть регулятора довольно простая, на вход поступает вектор состояний квадрокоптера 
+и желаемое состояние на некоторое количество 
+шагов вперед. Количество шагов называется горизонтом предсказания. Далее 
+внутри регулятора происходит моделирование поведение квадрокоптера с управлением, которое может быть
+изначально проинициализировано или получено с предыдущего шага.
+Затем происходит минимизация заданного критерия качества, который обычно имеет следующий вид:
+
+\begin{equation}
+    J = \sum_{k=0}^{N-1} \left( e_k^T Q e_k + u_k^T R u_k \right),
+\end{equation}
+
+где \(X_k\) — состояние системы на \(k\)-м шаге, \(X_k^d\) — желаемое состояние на \(k\)-м шаге, \(U_k\) — управление на \(k\)-м шаге, \(Q\) и \(R\) — весовые матрицы, определяющие важность отклонения состояния и управления соответственно, \(N\) — горизонт предсказания.
+
+Минимизация критерия качества осуществляется с учетом ограничений на динамику системы, которые задаются в виде:
+
+\begin{equation}
+    X_{k+1} = f(X_k, U_k),
+\end{equation}
+
+где \(f(X_k, U_k)\) — нелинейная модель квадрокоптера, а также ограничений на управление и состояния, например:
+
+\begin{equation}
+    U_{\text{min}} \leq U_k \leq U_{\text{max}}, \quad X_{\text{min}} \leq X_k \leq X_{\text{max}}.
+\end{equation}
+
+Решение задачи оптимизации дает последовательность управлений \(\{U_0, U_1, \dots, U_{N-1}\}\), из которых на выходе регулятора используется только первое управление \(U_0\). Это управление подается на квадрокоптер, после чего процесс повторяется на следующем временном шаге с обновленным состоянием системы.
+
+
+Регулятор можно расширять и модифицировать, можно ввести ограничения, штрафные стоимости за быстрые переключения управления,
+изменить модель объекта, например учитывать характер внешних возмущений.
+
+
+В среде Matlab/Simulink есть реализация Nonlinear MPC регулятора, но в текущей работе было принято решение полностью написать 
+функцию Nonlinear MPC регулятора с введением некоторых модификаций, и чтобы в дальнейшем было проще перенести 
+реализацию на реальную систему.
+
+Система управления не разделена на контуры, 
+и реализует вышеописанную логику. Схема регулятора представлена на рисунке \ref{fig:mpc-1}. 
+Для минимизации критерия \(J\) используется градиентный спуск, в математическом представлении:
+
+\begin{equation}
+    U_{k+1} = U_k - \nabla J(U_k).
+\end{equation}
+
+Также введены дополнительные мягкие ограничения на углы \(\phi\) и \(\theta\), чтобы квадрокоптер
+не переворачивался в воздухе.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.8 \textwidth]{mpc-1.png}
+    \caption{Схема регулятора Nonlinear MPC}
+    \label{fig:mpc-1}
+\end{figure}
 
 
 \endinput

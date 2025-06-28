@@ -1,8 +1,210 @@
-\chapter{}
-\label{ch:chap3}
+\chapter{Реализация квадрокоптера на базе STM32F722}
 
-\section{}
-\label{sec:cond3}
+Основной задачей являлась 
+реализация эффективной системы стабилизации и управления 
+полетом с использованием линейного квадратичного регулятора LQR 
+с линеаризацией обратной связью. Выбор 
+LQR был обусловлен его хорошим соотношением между вычислительной 
+нагрузкой и качеством управления, что видно 
+по результатам моделирования приведенным в предыдущей главе.
+
+\section{Аппаратная часть квадрокоптера}
+
+В результате разработан квадрокоптер, построенный на базе готового 
+полетного контроллера Radiolink F722, в основе которого лежит 
+микроконтроллер STM32F722\cite{RadiolinkF722}\cite{STM32F722}. 
+Полетный контроллер Radiolink F722 включает в себя встроенный датчик пространственного положения 
+и гироскопа ICM42688-P. Взаимодействие с датчиком осуществлялось по интерфейсу SPI\cite{ICM42688P}.
+
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.3 \textwidth]{flight-controller-1.png}
+    \caption{Полетный контроллер Radiolink F722}
+    \label{}
+\end{figure}
+
+Управление четырьмя моторами осуществлялось с помощью широтно-импульсной модуляции
+через электронные регуляторы скорости(ESC). На квадрокоптер были установлены популярные бесколлектрные моторы
+EMAX ECO || 2306 1300 KV\cite{EmaxECO1300KV}. KV --- это стандартная характеристика бесколлекторных моторов, которое означает
+количество оборотов на вольт без нагрузки.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.45 \textwidth]{motor-1.png}
+    \caption{Мотор EMAX ECO || 2306 1300 KV}
+    \label{}
+\end{figure}
+
+
+В качестве рамы квадрокоптера было выбрано готовое решение --- корпус Mark 4 295 мм.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.8 \textwidth]{drone.JPG}
+	\caption{Квадрокоптер в собранном виде}
+	\label{}
+\end{figure}
+
+
+В среде САПР среде Solidworks была реализована 3D модель квадрокоптера. Эта модель была
+импортирована в среду Matlab/Simulink для имитационного моделирования.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=0.8 \textwidth]{cad-model-1.png}
+	\caption{3D модель квадрокоптера в Solidworks}
+	\label{}
+\end{figure}
+
+\section{Программное обеспечение квадрокоптера}
+
+Разработка программного обеспечения велась в среде 
+STM32CubeIDE. Предварительно были изучены исходные файлы открытой 
+прошивки полетных контроллеров Betaflight, благодаря которым удалось произвести
+обратное проектирование полетного контроллера для разработки собственного программного обеспечения\cite{Betaflight}.
+
+Для удобной и универсальной коммуникации с квадрокоптером была выбрана коммуникация по 
+протоколу MQTT, который часто используется в проектах интернет вещей в сетях 
+с низкой пропускной способностью\cite{MQTT}. Таким образом сообщения доходят быстро и довольно стабильно
+при должной настройке. Так как микроконтроллер STM32F722 не оснащен WI-FI модулем к нему 
+был подключен микроконтроллер ESP8266, который обладает встроенным WI-FI модулем и способен 
+принимать команды по MQTT, передавая их на STM32F722 по интерфейсу UART.
+
+\begin{figure}[ht]
+	\centering
+\hspace*{\fill}%
+	\begin{subfigure}[b]{0.49\textwidth}
+        \centering
+		\includegraphics[height=9cm,keepaspectratio]{esp8266.png}
+		\caption{}
+		\label{fig:tiger1}
+	\end{subfigure}
+\hfill
+	\begin{subfigure}[b]{0.49\textwidth}
+        \centering
+		\includegraphics[height=9cm,keepaspectratio]{drone-inside-1.png}
+        \caption{}
+		\label{fig:tiger2}
+	\end{subfigure}
+\hspace*{\fill}%
+	\caption{На рисунке (а) ESP8266. На рисунке (б)Встроенный ESP8266 на квадрокоптере}
+	\label{fig:tiger}
+\end{figure}
+
+\newpage
+
+Также был сделана панель управления для управления квадрокоптером через окно
+браузера. 
+
+
+\begin{figure}[ht]
+	\centering
+\hspace*{\fill}%
+	\begin{subfigure}[b]{0.49\textwidth}
+        \centering
+		\includegraphics[height=9cm,keepaspectratio]{dashboard-1.png}
+		\caption{}
+		\label{fig:tiger1}
+	\end{subfigure}
+\hfill
+	\begin{subfigure}[b]{0.49\textwidth}
+        \centering
+		\includegraphics[height=9cm,keepaspectratio]{dashboard-2.png}
+        \caption{}
+		\label{fig:tiger2}
+	\end{subfigure}
+\hspace*{\fill}%
+	\caption{Панель управления квадрокоптером в браузере}
+	\label{fig:tiger}
+\end{figure}
+
+В качестве брокера сообщений для обеспечения передачи команд от компьютера к 
+микроконтроллеру ESP8266 был выбран популярный - Mosquitto, который можно развернуть 
+локальной машине\cite{Mosquitto}.
+
+\newpage
+
+\section{Локализация квадрокоптера}
+
+Для решения задачи локализации квадрокоптера было решено использовать визуальные маркеры apriltag\cite{AprilTag}.
+В библиотеке OpenCV уже есть встроенные функции для детектирования и отслеживания маркеров apriltag\cite{OpenCV}\cite{Aruco}.
+Были также написана логика для калибровки камеры для получения координат 
+ по осям: X, Y, Z в системе СИ. Код приложения для отслеживания визуального маркера 
+запускался на одноплатном компьютере Raspberry PI 4b с 4 Гб оперативной памяти. 
+Использовалась камера Raspberry Pi Camera Module Rev 1.3 с разрешением 5 мегапикселей.
+На каждом кадре осуществляется поиск маркера, рассчитанные координаты отправляются по
+MQTT на квадрокоптер.
+
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.5 \textwidth]{drone-apriltag.png}
+    \caption{Apriltag 36h11 закрепленный на квадрокоптере}
+    \label{}
+\end{figure}
+
+\begin{figure}[ht]
+	\centering
+\hspace*{\fill}%
+	\begin{subfigure}[b]{0.49\textwidth}
+        \centering
+		\includegraphics[height=9cm,keepaspectratio]{camera+drone_1.png}
+		\caption{}
+		\label{fig:tiger1}
+	\end{subfigure}
+\hfill
+	\begin{subfigure}[b]{0.49\textwidth}
+        \centering
+		\includegraphics[height=9cm,keepaspectratio]{camera+drone_2.png}
+        \caption{}
+		\label{fig:tiger2}
+	\end{subfigure}
+\hspace*{\fill}%
+	\caption{Детектирование тэга на камере}
+	\label{fig:tiger}
+\end{figure}
+
+\newpage
+
+
+\section{Тестирование квадрокоптера}
+
+Разработанный прототип частично тестировался в полевых условиях на двух стендах и в свободном полете.
+
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.5 \textwidth]{drone_fly_1.png}
+    \caption{Тестирование квадрокоптера в свободном полете}
+    \label{}
+\end{figure}
+
+\begin{figure}[ht]
+	\centering
+\hspace*{\fill}%
+	\begin{subfigure}[b]{0.49\textwidth}
+        \centering
+		\includegraphics[height=9cm,keepaspectratio]{test-2.png}
+		\caption{}
+		\label{fig:tiger1}
+	\end{subfigure}
+\hfill
+	\begin{subfigure}[b]{0.49\textwidth}
+        \centering
+		\includegraphics[height=9cm,keepaspectratio]{test-1.png}
+        \caption{}
+		\label{fig:tiger2}
+	\end{subfigure}
+\hspace*{\fill}%
+	\caption{Тестирование квадрокоптера на стендах}
+	\label{fig:tiger}
+\end{figure}
+
+Тестирование на предмет слежения за траекторией не удалось в силу трудностей с построением специального полигона, 
+однако
+регулятор показал свою работоспособность в решении задачи стабилизации 
+квадрокоптера. 
 
 
 \endinput

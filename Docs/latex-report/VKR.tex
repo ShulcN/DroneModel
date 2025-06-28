@@ -100,9 +100,11 @@
     colorlinks=true,                                % Все ссылки и гиперссылки цветные
     linktoc=all,                                    % В оглавлении ссылки подключатся для всех отображаемых уровней
     linktocpage=true,                               % Ссылка - только номер страницы, а не весь заголовок (так выглядит аккуратнее)
-    linkcolor=red,                                  % Цвет ссылок и гиперссылок - красный
-    citecolor=red                                   % Цвет цитировний - красный
-}
+    linkcolor=black,                                  % Цвет ссылок и гиперссылок - красный
+    citecolor=black,                                   % Цвет цитировний - красный
+    urlcolor=black
+    }
+
 
 %%% Настраиваем отображение списков %%%
 
@@ -142,8 +144,10 @@ doi=false,                                          % Не отображать 
 isbn=false,                                         % Не показывать ISBN, ISSN, ISRN
 ]{biblatex}[2016/09/17]
 \DeclareDelimFormat{bibinitdelim}{}                 % Убираем пробел между инициалами (Иванов И.И. вместо Иванов И. И.)
-\addbibresource{biba.bib}                           % Определяем файл с библиографией
-
+\addbibresource{/home/shulc/shulc/DroneModel/Docs/latex-report/VKR.bib}                           % Определяем файл с библиографией
+%\addbibresource{/home/shulc/shulc/DroneModel/Docs/latex-report/VKR.bcf}    
+%\addbibresource{/home/shulc/shulc/DroneModel/Docs/latex-report/VKR.bbl}                           % Определяем файл с библиографией
+%\addbibresource{/home/shulc/shulc/DroneModel/Docs/latex-report/biba.bib}
 %%% Скрипт, который автоматически подбирает язык (и, следовательно, формат) для каждой библиографической записи %%%
 %%% Если в названии работы есть кириллица - меняем значение поля langid на russian %%%
 %%% Все оставшиеся пустые места в поле langid заменяем на english %%%
@@ -171,25 +175,102 @@ isbn=false,                                         % Не показывать 
 \usepackage{textcomp}                               % Поддержка "сложных" печатных символов типа значков иены, копирайта и т.д.
 \usepackage[version=4]{mhchem}                      % Красивые химические уравнения
 \usepackage{amsmath}                                % Усовершенствование отображения математических выражений 
+\usepackage{listings}
 
+
+\usepackage{xcolor}
+
+%New colors defined below
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.2,0.2,0.2}
+\definecolor{codepurple}{rgb}{0.6,0.2,0}
+\definecolor{backcolour}{rgb}{0.98,0.98,0.98}
+
+%Code listing style named "mystyle"
+\lstdefinestyle{mystyle}{
+  backgroundcolor=\color{backcolour}, commentstyle=\color{codegreen},
+  %keywordstyle=\color{magenta},
+  %numberstyle=\tiny\color{codegray},
+  stringstyle=\color{codepurple},
+  %basicstyle=\ttfamily\footnotesize,
+  %breakatwhitespace=false,         
+  %breaklines=false,                 
+  %captionpos=b,                    
+  %keepspaces=false,  
+  % shownumbers=false,               
+  % numbers=no,                    
+  % numbersep=5pt,                  
+  %showspaces=false,                
+  %showstringspaces=false,
+  %showtabs=false,                  
+  %tabsize=2
+  % showstringspaces=true
+  basicstyle=\ttfamily\small,
+  columns=fullflexible, % или fixed
+  keepspaces=true,
+  showstringspaces=false,
+  breaklines=true,
+  keywordstyle=\color{blue}\bfseries,
+  % language=C, % или другой язык, если используешь
+  upquote=true
+}
+
+%"mystyle" code listing set
+\lstset{style=mystyle}
+
+
+\newif\iflabelused
+
+\makeatletter
+\xpretocmd{\[}{\global\labelusedfalse}{}{}
+\xpretocmd{\label}{\global\labelusedtrue}{}{}
+\xpretocmd{\]}{%
+  \iflabelused
+  \global\labelusedfalse%
+  \else
+  \let\eqno\relax
+  \let\@eqnnum\relax
+  \global\labelusedfalse
+  \addtocounter{equation}{-1}% Correct the value of the equation counter!
+  \fi
+}{}{}
+\makeatother                             % Усовершенствование отображения математических выражений 
+\setcounter{MaxMatrixCols}{12}
 %%% Вставляем по очереди все содержательные части документа %%%
+
+\usepackage{pdfpages}
 
 \begin{document}
 
 %\input{1_title}                                     % Титульник
+%\input{title_prac_3}
+
+\includepdf[]{/home/shulc/shulc/DroneModel/Docs/latex-report/Титульный_лист_ВКР_Носов_А.С..pdf}
+\includepdf[pages={1-2}]{/home/shulc/shulc/DroneModel/Docs/latex-report/Задание_ВКР_Носов_А.С.-2.pdf}
+\includepdf[pages={1-2}]{/home/shulc/shulc/DroneModel/Docs/latex-report/Аннотация__ВКР_Носов_А.С..pdf}
+
+
 
 \newpage % Переходим на новую страницу
-%\setcounter{page}{2} % Начинаем считать номера страниц со второй
+\setcounter{page}{6} % Начинаем считать номера страниц со второй
 \OnehalfSpacing* % Задаем полуторный интервал текста (в титульнике одинарный, поэтому команда стоит после него)
 
-%\tableofcontents*                                  % Автособираемое оглавление
+\tableofcontents*                                  % Автособираемое оглавление
 
-\input{2_chap1}                                     % Введение
-% \input{3_chap2}                                     % Первая глава
-% \input{4_chap3}                                     % Вторая глава
-% \input{5_chap4}                                     % Третья глава
-% \input{6_chap5}     
-% \input{7_chap6}
-% \input{ending}
+\input{2_chap1}    % Введение
+\input{3_chap2}   % Вывод мат-модели
+%\input{3_chap2-2} % Моделирование для практики
+\input{4_chap3}     % Библиографический поиск
+\input{5_chap4}     % Вывод законов управления
+\input{6_chap5}     % Моделирование
+\input{7_chap6}
+\input{ending}
+\nocite{*}
+\printbibliography[title=Список использованных источников]
+\input{Addition_A.tex}
+\input{Addition_B.tex}
+\input{Addition_C.tex}
+\input{Addition_D.tex}
+\input{Addition_E.tex}
 
 \end{document}

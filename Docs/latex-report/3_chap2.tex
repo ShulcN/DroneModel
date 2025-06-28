@@ -15,7 +15,7 @@
 
 \begin{figure}[ht]
     \centering
-    \includegraphics[width=0.8 \textwidth]{math-model.png}
+    \includegraphics[width=0.6 \textwidth]{math-model.png}
     \caption{Схематичное изображение квадрокоптера}
 \end{figure}
 
@@ -64,35 +64,37 @@
     \label{fig:point-rot-3}
 \end{figure}
 
+\newpage
+
 Выразим новые координаты \(y_2, z_2\) через расстояние от начала координат и угол \(\alpha_2\).
 Получим: \(y_2=r\cos(\alpha_2)\), \(z_2=r\sin(\alpha_2)\). Где \(\cos(\alpha_2)=\cos(\alpha_1+\phi)=\cos(\alpha_1)\cos(\phi)-\sin(\alpha_1)\sin(\phi)\) и \(\sin(\alpha_2)=\sin(\alpha_1)\cos(\phi)+\cos(\alpha_1)\sin(\phi)\).
 
 В итоге получаем следующую систему для перехода при повороте на угол \(\phi\) вокруг оси \(X\):
 \begin{equation}
 \begin{cases}
-    x_2 = x_1\\
-    y_2 = r (\cos(\alpha_1)\cos(\phi)-\sin(\alpha_1)\sin(\phi))\\
-    z_2 = r (\sin(\alpha_1)\cos(\phi)+\cos(\alpha_1)\sin(\phi))
-\end{cases}
+    x_2 = x_1;\\
+    y_2 = r (\cos(\alpha_1)\cos(\phi)-\sin(\alpha_1)\sin(\phi));\\
+    z_2 = r (\sin(\alpha_1)\cos(\phi)+\cos(\alpha_1)\sin(\phi)).
+\end{cases}.
 \end{equation}
 Заменим \(\cos(\alpha_1)=\frac{y_1}{r}\) и \(\sin(\alpha_1)=\frac{z_1}{r}\):
 \begin{equation}
 \begin{cases}
-    x_2 = x_1\\
-    y_2 = r \left(\frac{y_1}{r}\cos(\phi)-\frac{z_1}{r}\sin(\phi)\right)\\
-    z_2 = r \left(\frac{z_1}{r}\cos(\phi)+\frac{y_1}{r}\sin(\phi)\right)
+    x_2 = x_1;\\
+    y_2 = r \left(\frac{y_1}{r}\cos(\phi)-\frac{z_1}{r}\sin(\phi)\right);\\
+    z_2 = r \left(\frac{z_1}{r}\cos(\phi)+\frac{y_1}{r}\sin(\phi)\right).
 \end{cases}
 \end{equation}
 Упростим выражения:
 \begin{equation}
 \begin{cases}
-    x_2 = x_1\\
-    y_2 =  y_1 \cos(\phi)-z_1\sin(\phi)\\
-    z_2 = y_1\sin(\phi)+z_1 \cos(\phi)
+    x_2 = x_1;\\
+    y_2 =  y_1 \cos(\phi)-z_1\sin(\phi);\\
+    z_2 = y_1\sin(\phi)+z_1 \cos(\phi),
 \end{cases}
 \end{equation}
 
-В матричном виде:
+а матричном виде:
 
 \begin{equation}
 \begin{bmatrix}
@@ -106,7 +108,7 @@
 \cdot
 \begin{bmatrix}
     x_1 \\ y_1 \\z_1
-\end{bmatrix}
+\end{bmatrix}.
 \end{equation}
 
 Аналогичные матрицы поворота используются для поворота вокруг осей \(Y\) и \(Z\).
@@ -116,7 +118,7 @@ R_y(\theta) = \begin{bmatrix}
     \cos(\theta) & 0 & \sin(\theta) \\
     0 & 1 & 0 \\
     -\sin(\theta) & 0 & \cos(\theta)
-\end{bmatrix} 
+\end{bmatrix}; 
 \end{equation}
 
 \begin{equation}
@@ -124,7 +126,7 @@ R_z(\psi) = \begin{bmatrix}
     \cos(\psi) & -\sin(\psi) & 0 \\
     \sin(\psi) & \cos(\psi) & 0 \\
     0 & 0 & 1
-\end{bmatrix}
+\end{bmatrix}.
 \end{equation}
 
 
@@ -175,7 +177,7 @@ v =
 в следующем виде:
 
 \begin{equation}
-T = T_{1} + T_{2} + T_{3} + T_{4}
+T = T_{1} + T_{2} + T_{3} + T_{4};
 \end{equation}
 \begin{equation}
 T_{i} = k_i \omega_i^2,
@@ -242,20 +244,20 @@ F_{drag} = - \frac{1}{2} \rho  C_{drag} S \| r \| r,
 \begin{equation}
 m \ddot{r} =
 T R - m \begin{bmatrix} 0 \\ 0 \\ g \end{bmatrix} + F_{flap} + F_{ind} + F_{drag}
-\end{equation}
+;\end{equation}
 
 \begin{equation}
 m \ddot{r} =
 T R - m \begin{bmatrix} 0 \\ 0 \\ g \end{bmatrix} - T R A_{ind} R_T \dot{r} - T R A_{flap} R_T \dot{r} -  \frac{1}{2} \rho C_{drag} S \sqrt{v_x^2 + v_y^2 + v_z^2} \dot{r}
-\end{equation}
+.\end{equation}
 
 Из этого уравнения можно получить систему уравнений для выражения положения квадрокоптера в глобальной системе координат:
 
 \begin{equation}
 \begin{cases}
-    \ddot{r}_x = \frac{T \cos\theta \cos\psi - T (R A_{ind} R^T \dot{r})_x - T (R A_{flap} R^T \dot{r})_x - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_x}{m} \\
-    \ddot{r}_y = \frac{T \cos\theta \sin\psi - T (R A_{ind} R^T \dot{r})_y - T (R A_{flap} R^T \dot{r})_y - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_y}{m} \\
-    \ddot{r}_z = \frac{-T \sin\theta - T (R A_{ind} R^T \dot{r})_z - T (R A_{flap} R^T \dot{r})_z - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_z}{m} - g
+    \ddot{r}_x = \frac{T (\cos \psi \sin \theta \cos \phi + \sin \psi \sin \phi) - T (R A_{ind} R^T \dot{r})_x - T (R A_{flap} R^T \dot{r})_x - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_x}{m}; \\
+    \ddot{r}_y = \frac{T (\sin \psi \sin \theta \cos \phi - \cos \psi \sin \phi) - T (R A_{ind} R^T \dot{r})_y - T (R A_{flap} R^T \dot{r})_y - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_y}{m}; \\
+    \ddot{r}_z = \frac{T \cos\theta\cos\phi - T (R A_{ind} R^T \dot{r})_z - T (R A_{flap} R^T \dot{r})_z - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_z}{m} - g.
 \end{cases}
 \end{equation}
 
@@ -286,7 +288,7 @@ T R - m \begin{bmatrix} 0 \\ 0 \\ g \end{bmatrix} - T R A_{ind} R_T \dot{r} - T 
     \dot{\phi} \\
     0 \\
     0
-\end{bmatrix}
+\end{bmatrix};
 \end{equation}
 
 \begin{equation}
@@ -301,7 +303,7 @@ R_x({-\phi}) \begin{bmatrix}
         0 \\
         \cos \phi \\
         -\sin \phi
-    \end{bmatrix}
+    \end{bmatrix};
 \end{equation}
 
 \begin{equation}
@@ -316,7 +318,7 @@ R_x({-\phi}) R_y({-\theta}) \begin{bmatrix}
         -\sin \theta \\
         \sin \phi \cos \theta \\
         \cos \phi \cos \theta
-    \end{bmatrix}
+    \end{bmatrix}.
 \end{equation}
 
 
@@ -334,7 +336,7 @@ R_x({-\phi}) R_y({-\theta}) \begin{bmatrix}
     \dot{\phi} \\
     \dot{\theta} \\
     \dot{\psi}
-\end{bmatrix}
+\end{bmatrix}.
 \end{equation}
 
 
@@ -355,8 +357,8 @@ W^{-1} = \begin{bmatrix}
 
 \begin{equation}
 \begin{cases}
-    \tau_{\phi} = \tau_{q\phi} + \tau_{m\phi} + \tau_{p\phi}\\
-    \tau_{\theta} = \tau_{q\theta} + \tau_{m\theta} + \tau_{p\theta}\\
+    \tau_{\phi} = \tau_{q\phi} + \tau_{m\phi} + \tau_{p\phi};\\
+    \tau_{\theta} = \tau_{q\theta} + \tau_{m\theta} + \tau_{p\theta};\\
     \tau_{\psi} = \tau_{q\psi},
 \end{cases}
 \end{equation}
@@ -366,25 +368,25 @@ W^{-1} = \begin{bmatrix}
  - гироскопические моменты винтов. Эти моменты могут быть выражены следующим образом:
 
 \begin{equation}
-\tau_{q\phi} = (T_3 - T_1)l
+\tau_{q\phi} = (T_3 - T_1)l;
 \end{equation}
 \begin{equation}
-\tau_{q\theta} = (T_2 - T_4)l 
+\tau_{q\theta} = (T_2 - T_4)l;
 \end{equation} 
 \begin{equation}
-\tau_{q\psi} = (T_2 + T_4 - T_1 - T_3)
+\tau_{q\psi} = (T_2 + T_4 - T_1 - T_3);
 \end{equation} 
 \begin{equation}
-\tau_{m\phi} = I_m \omega_{\theta}(\omega_1+\omega_3-\omega_2-\omega_4)
+\tau_{m\phi} = I_m \omega_{\theta}(\omega_1+\omega_3-\omega_2-\omega_4);
 \end{equation} 
 \begin{equation}
-\tau_{m\theta} = I_m \omega_{\phi}(\omega_2+\omega_4-\omega_1-\omega_3)
+\tau_{m\theta} = I_m \omega_{\phi}(\omega_2+\omega_4-\omega_1-\omega_3);
 \end{equation} 
 \begin{equation}
-\tau_{p\phi} = I_p \omega_{\theta}(\omega_1+\omega_3-\omega_2-\omega_4)
+\tau_{p\phi} = I_p \omega_{\theta}(\omega_1+\omega_3-\omega_2-\omega_4);
 \end{equation} 
 \begin{equation}
-\tau_{p\theta} = I_p \omega_{\phi}(\omega_2+\omega_4-\omega_1-\omega_3)
+\tau_{p\theta} = I_p \omega_{\phi}(\omega_2+\omega_4-\omega_1-\omega_3).
 \end{equation} 
 
 Однако значения гироскопических моментов мало, поэтому ими можно пренебречь.
@@ -398,9 +400,9 @@ I\dot{\omega}+\omega \times (I \omega) = \tau,
 
 \begin{equation}
 \begin{cases}
-    \tau_{\phi} =  I_{x} \dot{\omega}_{\phi} + (I_z-I_y) \omega_{\theta} \omega_{\psi} \\
-    \tau_{\theta} = I_{y} \dot{\omega}_{\theta} + (I_x-I_z) \omega_{\phi} \omega_{\psi} \\
-    \tau_{\psi} = I_{z} \dot{\omega}_{\psi} + (I_y-I_x) \omega_{\phi} \omega_{\theta} 
+    \tau_{\phi} =  I_{x} \dot{\omega}_{\phi} + (I_z-I_y) \omega_{\theta} \omega_{\psi}; \\
+    \tau_{\theta} = I_{y} \dot{\omega}_{\theta} + (I_x-I_z) \omega_{\phi} \omega_{\psi}; \\
+    \tau_{\psi} = I_{z} \dot{\omega}_{\psi} + (I_y-I_x) \omega_{\phi} \omega_{\theta}.
 \end{cases}
 \end{equation}
 
@@ -408,36 +410,38 @@ I\dot{\omega}+\omega \times (I \omega) = \tau,
 
 \begin{equation}
 \begin{cases}
-    \dot{\omega}_{\phi} = \frac{\tau_{\phi}+(I_z-I_y) \omega_{\theta} \omega_{\psi}}{I_{x}} \\
-    \dot{\omega}_{\theta} = \frac{\tau_{\theta}+(I_x-I_z) \omega_{\phi} \omega_{\psi}}{I_{y}} \\
-    \dot{\omega}_{\psi} = \frac{\tau_{\psi}+(I_y-I_x) \omega_{\phi} \omega_{\theta}}{I_{z}}
+    \dot{\omega}_{\phi} = \frac{\tau_{\phi}+(I_z-I_y) \omega_{\theta} \omega_{\psi}}{I_{x}}; \\
+    \dot{\omega}_{\theta} = \frac{\tau_{\theta}+(I_x-I_z) \omega_{\phi} \omega_{\psi}}{I_{y}}; \\
+    \dot{\omega}_{\psi} = \frac{\tau_{\psi}+(I_y-I_x) \omega_{\phi} \omega_{\theta}}{I_{z}}.
 \end{cases}
 \end{equation}
 
+\newpage 
+
 \section{Итоговая система уравнений динамики квадрокоптера}
 
-Таким образом, итоговая система уравнений динамики квадрокоптера будет выглядеть следующим образом:
+Таким образом, итоговая система уравнений динамики квадрокоптера:
 
 \begin{equation}
 \begin{cases}
-    \ddot{r}_x = \frac{T \cos\theta \cos\psi - T (R A_{ind} R^T \dot{r})_x - T (R A_{flap} R^T \dot{r})_x - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_x}{m} \\
-    \ddot{r}_y = \frac{T \cos\theta \sin\psi - T (R A_{ind} R^T \dot{r})_y - T (R A_{flap} R^T \dot{r})_y - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_y}{m} \\
-    \ddot{r}_z = \frac{-T \sin\theta - T (R A_{ind} R^T \dot{r})_z - T (R A_{flap} R^T \dot{r})_z - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_z}{m} - g \\
-    \dot{\phi} = \omega_{\phi} + \tan\theta (\omega_{\theta} \sin\phi + \omega_{\psi} \cos\phi) \\
-    \dot{\theta} = \omega_{\theta} \cos\phi - \omega_{\psi} \sin\phi \\
-    \dot{\psi} = \frac{\sin\phi}{\cos\theta} \omega_{\theta} + \frac{\cos\phi}{\cos\theta} \omega_{\psi} \\
-    \dot{\omega}_{\phi} = \frac{\tau_{\phi}+(I_z-I_y) \omega_{\theta} \omega_{\psi}}{I_{x}} \\
-    \dot{\omega}_{\theta} = \frac{\tau_{\theta}+(I_x-I_z) \omega_{\phi} \omega_{\psi}}{I_{y}} \\
-    \dot{\omega}_{\psi} = \frac{\tau_{\psi}+(I_y-I_x) \omega_{\phi} \omega_{\theta}}{I_{z}} \\
+    \ddot{r}_x = \frac{T (\cos \psi \sin \theta \cos \phi + \sin \psi \sin \phi) - T (R A_{ind} R^T \dot{r})_x - T (R A_{flap} R^T \dot{r})_x - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_x}{m}; \\
+    \ddot{r}_y = \frac{T (\sin \psi \sin \theta \cos \phi - \cos \psi \sin \phi) - T (R A_{ind} R^T \dot{r})_y - T (R A_{flap} R^T \dot{r})_y - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_y}{m}; \\
+    \ddot{r}_z = \frac{T \cos\theta\cos\phi - T (R A_{ind} R^T \dot{r})_z - T (R A_{flap} R^T \dot{r})_z - \frac{1}{2} \rho C_{drag} S \|\dot{r}\| \dot{r}_z}{m} - g; \\
+    \dot{\phi} = \omega_{\phi} + \tan\theta (\omega_{\theta} \sin\phi + \omega_{\psi} \cos\phi); \\
+    \dot{\theta} = \omega_{\theta} \cos\phi - \omega_{\psi} \sin\phi; \\
+    \dot{\psi} = \frac{\sin\phi}{\cos\theta} \omega_{\theta} + \frac{\cos\phi}{\cos\theta} \omega_{\psi}; \\
+    \dot{\omega}_{\phi} = \frac{\tau_{\phi}+(I_z-I_y) \omega_{\theta} \omega_{\psi}}{I_{x}}; \\
+    \dot{\omega}_{\theta} = \frac{\tau_{\theta}+(I_x-I_z) \omega_{\phi} \omega_{\psi}}{I_{y}}; \\
+    \dot{\omega}_{\psi} = \frac{\tau_{\psi}+(I_y-I_x) \omega_{\phi} \omega_{\theta}}{I_{z}}. \\
 \end{cases}
 \label{eq:system}
 \end{equation}
 
-В данной модели представлены динамические уравнения описывающие поступательное и вращательное 
-движение квадрокоптера. Управление квадрокоптером осуществляется за счет изменения скорости 
-вращения четырех электродвигателей, которые создают тягу. Соответственно, меняя соотношения скоростей
-вращения электродвигателей, можно менять положение квадрокоптера в пространстве по 6 степеням свободы. Однако
-для корректного управления с качественно хорошими переходными процессами необходимо синтезировать 
+В уравнениях квадрокоптера присутствует множество нелинейностей, которые 
+осложняют синтез алгоритмов управления, в добавок к сложной модели - на квадрокоптер действуют внешние сопротивления.
+Поэтому для корректного управления с качественно хорошими 
+переходными процессами необходимо синтезировать 
 сложные системы управления.
+
 
 \endinput

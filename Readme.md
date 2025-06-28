@@ -5,6 +5,15 @@
 
 ## Project Description
 
+Video with results of work (Intermediate)
+
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/Ezlvn4jKs2A/0.jpg)](https://www.youtube.com/watch?v=Ezlvn4jKs2A)
+
+Video with modeling in the Simulink environment
+
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/pwtEpFcJs5k/0.jpg)](https://www.youtube.com/watch?v=pwtEpFcJs5k)
+
+
 ### Mandatory Part
 
 - Creating a brushless motor model in Simulink
@@ -17,6 +26,8 @@
 - Solving noise filtering issues
 - Calculating and modeling a controller for drone stabilization and tracking trajectory
 - Programming control laws and debugging
+- Creating a localization system for the quadcopter using visual markers apriltag
+- Creating an interface for controlling the quadcopter
 
 ### Optional Part
 - Connecting a GPS tracker

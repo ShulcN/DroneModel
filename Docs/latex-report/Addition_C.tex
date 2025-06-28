@@ -1,0 +1,462 @@
+\chapter{Приложение В}
+
+Листинг кода для микроконтроллера ESP8266
+
+\begin{lstlisting}[language=C++]
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+#include <ESP8266WebServer.h>
+#include <EEPROM.h>
+#include <DNSServer.h>
+#include <SoftwareSerial.h>
+#include <Ticker.h>
+
+EspSoftwareSerial::UART myPort;
+
+#define EEPROM_SIZE 512
+#define CONFIG_START 0
+#define MAX_STRING_LENGTH 40
+#define AP_NAME "ESP8266_MQTT_Setup"
+#define MQTT_RECONNECT_DELAY 2000
+unsigned long MAX_RECONNECT_DELAY = 30000;
+#define MQTT_KEEP_ALIVE 60 
+#define MQTT_BUFFER_SIZE 128
+#define WIFI_RECONNECT_INTERVAL 30000
+
+struct Configa {
+char wifi_ssid[MAX_STRING_LENGTH];
+char wifi_password[MAX_STRING_LENGTH];
+char mqtt_server[MAX_STRING_LENGTH];
+int mqtt_port;
+char mqtt_user[MAX_STRING_LENGTH];
+char mqtt_password[MAX_STRING_LENGTH];
+char mqtt_input_topic[MAX_STRING_LENGTH];
+char mqtt_output_topic[MAX_STRING_LENGTH];
+char mqtt_status_topic[MAX_STRING_LENGTH];
+bool valid;
+};
+
+Configa config;
+
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
+ESP8266WebServer webServer(80);
+DNSServer dnsServer;
+const byte DNS_PORT = 53;
+
+bool configMode = false;
+
+String serialBuffer = "";
+
+unsigned long lastReconnectAttempt = 0;
+unsigned long reconnectDelay = MQTT_RECONNECT_DELAY;
+unsigned long lastWifiCheckTime = 0;
+
+Ticker statusTicker;
+bool wifiConnected = false;
+
+#define MAX_QUEUED_MESSAGES 10
+struct MessageQueue {
+char topic[MAX_STRING_LENGTH];
+char payload[MQTT_BUFFER_SIZE];
+bool used;
+};
+MessageQueue messageQueue[MAX_QUEUED_MESSAGES];
+
+void saveConfig() {
+config.valid = true;
+EEPROM.put(CONFIG_START, config);
+EEPROM.commit();
+}
+
+bool loadConfig() {
+EEPROM.get(CONFIG_START, config);
+return config.valid;
+}
+
+void restartESP() {
+mqttClient.publish(config.mqtt_output_topic, "RESTART message. Restarting in 2 seconds...");
+delay(2000);
+ESP.restart();
+}
+
+void initMessageQueue() {
+for (int i = 0; i < MAX_QUEUED_MESSAGES; i++) {
+messageQueue[i].used = false;
+}
+}
+
+bool queueMessage(const char* topic, const char* payload) {
+for (int i = 0; i < MAX_QUEUED_MESSAGES; i++) {
+if (!messageQueue[i].used) {
+strncpy(messageQueue[i].topic, topic, MAX_STRING_LENGTH);
+strncpy(messageQueue[i].payload, payload, MQTT_BUFFER_SIZE);
+messageQueue[i].used = true;
+return true;
+}
+}
+return false;
+}
+
+void sendQueuedMessages() {
+if (!mqttClient.connected()) return;
+
+for (int i = 0; i < MAX_QUEUED_MESSAGES; i++) {
+if (messageQueue[i].used) {
+if (mqttClient.publish(messageQueue[i].topic, messageQueue[i].payload)) {
+messageQueue[i].used = false;
+} else {
+break; 
+}
+}
+}
+}
+
+bool publishWithQueue(const char* topic, const char* payload) {
+if (mqttClient.connected()) {
+return mqttClient.publish(topic, payload);
+} else {
+return queueMessage(topic, payload);
+}
+}
+
+void publishStatus() {
+//status message
+if (mqttClient.connected()) {
+String status = "{\"ip\":\"" + WiFi.localIP().toString() + 
+        "\",\"rssi\":" + String(WiFi.RSSI()) + 
+        ",\"uptime\":" + String(millis()/1000) + 
+        ",\"free_heap\":" + String(ESP.getFreeHeap()) + "}";
+mqttClient.publish(config.mqtt_status_topic, status.c_str(), false);
+}
+}
+
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+char message[length + 1];
+for (unsigned int i = 0; i < length; i++) {
+message[i] = (char)payload[i];
+}
+message[length] = '\0';
+Serial.println(message);
+
+if (strcmp(message, "echo") == 0) {
+publishWithQueue(config.mqtt_output_topic, "echo");
+} else if (strcmp(message, "RESTART") == 0) {
+restartESP();
+} else if (strcmp(message, "CONF-MODE") == 0) {
+enableConfigMode();
+} else if (strcmp(message, "STATUS") == 0) {
+publishStatus();
+} else {
+myPort.print(message);
+myPort.print(";\n");
+}
+}
+
+boolean connectToMqtt() {
+Serial.println("Connecting to MQTT...");
+
+String clientId = "ESP8266-";
+clientId += String(WiFi.macAddress());
+
+// Last Will and Testament (LWT)
+String statusTopic = String(config.mqtt_status_topic);
+String willMessage = "{\"status\":\"offline\",\"id\":\"" + clientId + "\"}";
+
+if (mqttClient.connect(clientId.c_str(), config.mqtt_user, config.mqtt_password, 
+              statusTopic.c_str(), 0, true, willMessage.c_str())) {
+Serial.println("Connected to MQTT broker");
+
+mqttClient.subscribe(config.mqtt_input_topic);
+Serial.print("Subscribed on topic: ");
+Serial.println(config.mqtt_input_topic);
+//status message
+String onlineMessage = "{\"status\":\"online\",\"id\":\"" + clientId + 
+                "\",\"ip\":\"" + WiFi.localIP().toString() + "\"}";
+mqttClient.publish(config.mqtt_status_topic, onlineMessage.c_str(), true);
+
+reconnectDelay = MQTT_RECONNECT_DELAY;
+
+sendQueuedMessages();
+
+return true;
+} else {
+Serial.print("Connection error: ");
+Serial.println(mqttClient.state());
+
+reconnectDelay = min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+return false;
+}
+}
+
+void checkMqttConnection() {
+if (!mqttClient.connected()) {
+unsigned long now = millis();
+if (now - lastReconnectAttempt > reconnectDelay) {
+lastReconnectAttempt = now;
+if (connectToMqtt()) {
+lastReconnectAttempt = 0;
+}
+}
+} else {
+mqttClient.loop();
+}
+}
+
+bool connectToWiFi() {
+if (strlen(config.wifi_ssid) == 0) {
+Serial.println("SSID not set");
+return false;
+}
+
+Serial.println("Connecting to wifi...");
+WiFi.mode(WIFI_STA);
+WiFi.begin(config.wifi_ssid, config.wifi_password);
+
+int attempts = 0;
+while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+delay(1000);
+Serial.print(".");
+attempts++;
+}
+
+if (WiFi.status() == WL_CONNECTED) {
+Serial.println("");
+Serial.print("Connected to WiFi, IP: ");
+Serial.println(WiFi.localIP());
+wifiConnected = true;
+return true;
+} else {
+Serial.println("");
+Serial.println("Not connected to WiFi");
+wifiConnected = false;
+return false;
+}
+}
+
+void checkWiFiConnection() {
+unsigned long currentMillis = millis();
+
+if (currentMillis - lastWifiCheckTime > WIFI_RECONNECT_INTERVAL) {
+lastWifiCheckTime = currentMillis;
+
+if (WiFi.status() != WL_CONNECTED) {
+Serial.println("WiFi connection lost, reconnection..,");
+WiFi.disconnect();
+connectToWiFi();
+}
+}
+}
+
+void startAP() {
+configMode = true;
+Serial.println("Starting soft AP...");
+
+WiFi.mode(WIFI_AP);
+WiFi.softAP(AP_NAME);
+
+Serial.print("Wifi Soft AP started. IP: ");
+Serial.println(WiFi.softAPIP());
+
+dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+}
+
+String getConfigPage() {
+String html = "<!DOCTYPE html>";
+html += "<html>";
+html += "<head>";
+html += "<meta charset='UTF-8'>";
+html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+html += "<title>ESP8266 MQTT Config</title>";
+html += "<style>";
+html += "body { font-family: Arial, sans-serif; margin: 20px; }";
+html += "h1 { color: #0066cc; }";
+html += ".container { max-width: 500px; margin: 0 auto; }";
+html += "label { display: block; margin-top: 10px; font-weight: bold; }";
+html += "input[type='text'], input[type='password'], input[type='number'] { width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; }";
+html += "button { background-color: #0066cc; color: white; border: none; padding: 10px 20px; margin-top: 20px; cursor: pointer; }";
+html += ".section { margin-top: 25px; border-top: 1px solid #ddd; padding-top: 15px; }";
+html += "</style>";
+html += "</head>";
+html += "<body>";
+html += "<div class='container'>";
+html += "<h1>ESP8266 MQTT Config</h1>";
+
+html += "<form action='/save' method='post'>";
+
+html += "<div class='section'>";
+html += "<h2>Wi-Fi Settings</h2>";
+html += "<label for='wifi_ssid'>Wifi SSID:</label>";
+html += "<input type='text' id='wifi_ssid' name='wifi_ssid' value='" + String(config.wifi_ssid) + "' required>";
+
+html += "<label for='wifi_password'>WiFi Pas:</label>";
+html += "<input type='password' id='wifi_password' name='wifi_password' value='" + String(config.wifi_password) + "'>";
+html += "</div>";
+
+html += "<div class='section'>";
+html += "<h2>MQTT Settings</h2>";
+html += "<label for='mqtt_server'>IP MQTT:</label>";
+html += "<input type='text' id='mqtt_server' name='mqtt_server' value='" + String(config.mqtt_server) + "' required>";
+
+html += "<label for='mqtt_port'>Port MQTT:</label>";
+html += "<input type='number' id='mqtt_port' name='mqtt_port' value='" + String(config.mqtt_port) + "' required>";
+
+html += "<label for='mqtt_user'>username MQTT:</label>";
+html += "<input type='text' id='mqtt_user' name='mqtt_user' value='" + String(config.mqtt_user) + "'>";
+
+html += "<label for='mqtt_password'>password MQTT:</label>";
+html += "<input type='password' id='mqtt_password' name='mqtt_password' value='" + String(config.mqtt_password) + "'>";
+html += "</div>";
+
+html += "<div class='section'>";
+html += "<h2>MQTT topics</h2>";
+html += "<label for='mqtt_input_topic'>Input topic:</label>";
+html += "<input type='text' id='mqtt_input_topic' name='mqtt_input_topic' value='" + String(config.mqtt_input_topic) + "' required>";
+
+html += "<label for='mqtt_output_topic'>Output topic:</label>";
+html += "<input type='text' id='mqtt_output_topic' name='mqtt_output_topic' value='" + String(config.mqtt_output_topic) + "' required>";
+
+html += "<label for='mqtt_status_topic'>Status topic:</label>";
+html += "<input type='text' id='mqtt_status_topic' name='mqtt_status_topic' value='" + String(config.mqtt_status_topic) + "' required>";
+html += "</div>";
+
+html += "<button type='submit'>Save and Reboot</button>";
+html += "</form>";
+
+html += "</div>";
+html += "</body>";
+html += "</html>";
+
+return html;
+}
+
+void setupWebServer() {
+webServer.on("/", HTTP_GET, []() {
+webServer.send(200, "text/html", getConfigPage());
+});
+
+webServer.on("/save", HTTP_POST, []() {
+strncpy(config.wifi_ssid, webServer.arg("wifi_ssid").c_str(), MAX_STRING_LENGTH);
+strncpy(config.wifi_password, webServer.arg("wifi_password").c_str(), MAX_STRING_LENGTH);
+strncpy(config.mqtt_server, webServer.arg("mqtt_server").c_str(), MAX_STRING_LENGTH);
+config.mqtt_port = webServer.arg("mqtt_port").toInt();
+strncpy(config.mqtt_user, webServer.arg("mqtt_user").c_str(), MAX_STRING_LENGTH);
+strncpy(config.mqtt_password, webServer.arg("mqtt_password").c_str(), MAX_STRING_LENGTH);
+strncpy(config.mqtt_input_topic, webServer.arg("mqtt_input_topic").c_str(), MAX_STRING_LENGTH);
+strncpy(config.mqtt_output_topic, webServer.arg("mqtt_output_topic").c_str(), MAX_STRING_LENGTH);
+strncpy(config.mqtt_status_topic, webServer.arg("mqtt_status_topic").c_str(), MAX_STRING_LENGTH);
+
+saveConfig();
+
+String html = "<!DOCTYPE html>";
+html += "<html>";
+html += "<head>";
+html += "<meta charset='UTF-8'>";
+html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+html += "<title>Settings are saved</title>";
+html += "<style>";
+html += "body { font-family: Arial, sans-serif; margin: 20px; text-align: center; }";
+html += "h1 { color: #0066cc; }";
+html += ".container { max-width: 500px; margin: 0 auto; }";
+html += "button { background-color: #0066cc; color: white; border: none; padding: 10px 20px; margin-top: 20px; cursor: pointer; }";
+html += "</style>";
+html += "</head>";
+html += "<body>";
+html += "<div class='container'>";
+html += "<h1>Settings have been saved. </h1>";
+html += "<p>Reboot in 5 seconds...</p>";
+html += "</div>";
+html += "</body>";
+html += "</html>";
+
+webServer.send(200, "text/html", html);
+
+delay(5000);
+ESP.restart();
+});
+
+webServer.begin();
+Serial.println("Web-server started");
+}
+
+void readSerialData() {
+while (myPort.available()) {
+String line = myPort.readStringUntil('\n');
+line.trim();
+if (line.length()) {
+publishWithQueue(config.mqtt_output_topic, line.c_str());
+}
+}
+
+while (Serial.available()) {
+char c = Serial.read();
+myPort.write(c);
+Serial.write(c); 
+}
+}
+
+void setup() {
+Serial.begin(9600);
+Serial.println("\n\nInitializing...");
+
+myPort.begin(9600, SWSERIAL_8N1, D2, D1, false);
+if (!myPort) {
+Serial.println("Invalid EspSoftwareSerial pin configuration, check config"); 
+while (1) {
+delay(1000);
+Serial.println("Invalid EspSoftwareSerial pin configuration, check config"); 
+}
+}
+
+initMessageQueue();
+
+EEPROM.begin(EEPROM_SIZE);
+
+if (loadConfig()) {
+Serial.println("Config loaded from EEPROM");
+} else {
+Serial.println("Not found config in EEPROM");
+strcpy(config.wifi_ssid, "");
+strcpy(config.wifi_password, "");
+strcpy(config.mqtt_server, "localhost");
+config.mqtt_port = 1883;
+strcpy(config.mqtt_user, "");
+strcpy(config.mqtt_password, "");
+strcpy(config.mqtt_input_topic, "esp/input");
+strcpy(config.mqtt_output_topic, "esp/output");
+strcpy(config.mqtt_status_topic, "esp/status");
+
+saveConfig();
+}
+
+mqttClient.setServer(config.mqtt_server, config.mqtt_port);
+mqttClient.setCallback(mqttCallback);
+mqttClient.setKeepAlive(MQTT_KEEP_ALIVE);
+mqttClient.setBufferSize(MQTT_BUFFER_SIZE);
+
+if (!connectToWiFi()) {
+startAP();
+} else {
+connectToMqtt();
+statusTicker.attach(60, publishStatus);
+}
+setupWebServer();
+}
+
+void loop() {
+if (configMode) {
+dnsServer.processNextRequest();
+webServer.handleClient();
+} else {
+checkWiFiConnection();
+if (wifiConnected) {
+checkMqttConnection();
+}
+webServer.handleClient();
+readSerialData();
+delay(10);
+}
+\end{lstlisting}
+
+\endinput

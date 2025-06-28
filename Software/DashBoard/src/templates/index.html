@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drone Control Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        /* Additional styles for the new controls */
+        .float-inputs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin: 10px 0;
+        }
+        
+        .float-inputs input {
+            width: 60px;
+            flex-grow: 0;
+        }
+        
+        .control-section {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        
+        .control-section h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Drone Control Panel</h1>
+        
+        <!-- MQTT Connection Section -->
+        <div class="section">
+            <h2>MQTT Connection</h2>
+            <div class="mqtt-status">
+                <span class="status disconnected" id="mqtt-status-indicator"></span>
+                <span id="mqtt-status-text">Disconnected</span>
+            </div>
+            <div class="input-group">
+                <input type="text" id="mqtt-broker" placeholder="MQTT Broker URL (ws://broker.example.com:8083/mqtt)" value="ws://broker.emqx.io:8083/mqtt">
+                <input type="text" id="mqtt-username" placeholder="Username (optional)">
+                <input type="text" id="mqtt-password" placeholder="Password (optional)" type="password">
+                <input type="text" id="mqtt-client-id" placeholder="Client ID" value="drone_control_panel_">
+                <button class="button" id="mqtt-connect">Connect</button>
+                <button class="button" id="mqtt-disconnect" disabled>Disconnect</button>
+            </div>
+        </div>
+
+        <!-- Video Stream Section -->
+        <div class="section">
+            <h2>Video Stream</h2>
+            <div class="input-group">
+                <input type="text" id="video-url" placeholder="Video Stream URL (LL-HLS)" value="https://cdnapi.kaltura.com/p/1645161/sp/164516100/playManifest/entryId/1_szwkpcvd/format/applehttp/protocol/https/flavorIds/1_1xdbzoa6,1_owqdr9ag/a.m3u8">
+                <button class="button" id="video-connect">Connect</button>
+                <button class="button" id="video-disconnect" disabled>Disconnect</button>
+            </div>
+            <div class="video-container">
+                <div class="video-placeholder" id="video-placeholder">Video stream not connected</div>
+                <video id="video-player" controls style="display:none;"></video>
+            </div>
+        </div>
+
+        <!-- Control Panel Section -->
+        <div class="section">
+            <h2>Control Panel</h2>
+            <div class="control-panel">
+                <button class="button stop" id="btn-stop" value="STOP">STOP</button>
+                <button class="button" id="btn-down" value="DOWN">DOWN</button>
+                <button class="button" id="btn-calibrate" value="CALB">CALIBRATE</button>
+                <button class="button" id="btn-echo" value="ECHO">ECHO</button>
+                <button class="button" id="btn-esp-echo" value="echo">ESP-ECHO</button>
+                <button class="button" id="btn-cube" value="CUBE">CUBE</button>
+                <button class="button" id="btn-restart-esp" value="RESTART">RESTART-ESP</button>
+                <button class="button" id="btn-test-motors" value="TEST-M">TEST-MOTORS</button>
+                <button class="button" id="btn-restart-drone" value="REBOOT">RESTART DRONE</button>
+                <button class="button" id="btn-get-acc-pos" value="GET_ACC-POS">GET-ACC-POS</button>
+                <button class="button" id="btn-get-gyro" value="GET_GYRO">GET-GYRO</button>
+            </div>
+            
+            <!-- New LQR Control Section -->
+            <div class="control-section">
+                <h3>LQR Control</h3>
+                <div class="float-inputs">
+                    <input type="number" id="lqr-param1" placeholder="Param 1" step="0.1">
+                    <input type="number" id="lqr-param2" placeholder="Param 2" step="0.1">
+                    <input type="number" id="lqr-param3" placeholder="Param 3" step="0.1">
+                </div>
+                <button class="button" id="btn-lqr">LQR</button>
+            </div>
+            
+            <!-- New Set Coefficients Section -->
+            <div class="control-section">
+                <h3>Set Coefficients</h3>
+                <div class="float-inputs">
+                    <input type="number" id="coeff-1" placeholder="C1" step="0.1">
+                    <input type="number" id="coeff-2" placeholder="C2" step="0.1">
+                    <input type="number" id="coeff-3" placeholder="C3" step="0.1">
+                    <input type="number" id="coeff-4" placeholder="C4" step="0.1">
+                    <input type="number" id="coeff-5" placeholder="C5" step="0.1">
+                    <input type="number" id="coeff-6" placeholder="C6" step="0.1">
+                    <input type="number" id="coeff-7" placeholder="C7" step="0.1">
+                    <input type="number" id="coeff-8" placeholder="C8" step="0.1">
+                    <input type="number" id="coeff-9" placeholder="C9" step="0.1">
+                    <input type="number" id="coeff-10" placeholder="C10" step="0.1">
+                    <input type="number" id="coeff-11" placeholder="C11" step="0.1">
+                    <input type="number" id="coeff-12" placeholder="C12" step="0.1">
+                </div>
+                <button class="button" id="btn-set-coeffs">SET COEFFS</button>
+            </div>
+            
+            <div class="input-group" style="margin-top: 15px;">
+                <input type="text" id="custom-command" placeholder="Custom command">
+                <button class="button" id="send-custom">Send</button>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>Set Coefficients</h3>
+            <div class="float-inputs">
+                <input type="number" id="coeff-n" placeholder="C1" step="1">
+                <input type="number" id="coeff-v" placeholder="C2" step="0.1">
+            </div>
+            <button class="button" id="btn-set-coeffs-n">SET COEFF</button>
+        </div>
+        
+        <div class="input-group" style="margin-top: 15px;">
+            <input type="text" id="custom-command" placeholder="Custom command">
+            <button class="button" id="send-custom">Send</button>
+        </div>
+
+        <!-- MQTT Output Section -->
+        <div class="section">
+            <h2>MQTT Output</h2>
+            <div>
+                <h3>Topic 1 - Control out</h3>
+                <div class="input-group">
+                    <input type="text" id="output-topic1" placeholder="Output Topic 1" value="drone/output">
+                </div>
+                <div class="output-container" id="output-container1"></div>
+            </div>
+            <div style="margin-top: 15px;">
+                <h3>Topic 2 - Status</h3>
+                <div class="input-group">
+                    <input type="text" id="output-topic2" placeholder="Output Topic 2" value="drone/status">
+                </div>
+                <div class="output-container" id="output-container2"></div>
+            </div>
+            <div style="margin-top: 15px;">
+                <h3>Topic 3 - Control input</h3>
+                <div class="input-group">
+                    <input type="text" id="output-topic3" placeholder="Output Topic 3" value="drone/input">
+                </div>
+                <div class="output-container" id="output-container3"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include MQTT.js and HLS.js libraries -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script> -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.2.4/hls.min.js"></script> -->
+    <script src="{{ url_for('static', filename='mqtt.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='hls.min.js') }}"></script>
+    
+    <script>
+        // DOM Elements
+        const mqttStatusIndicator = document.getElementById('mqtt-status-indicator');
+        const mqttStatusText = document.getElementById('mqtt-status-text');
+        const mqttBrokerInput = document.getElementById('mqtt-broker');
+        const mqttUsernameInput = document.getElementById('mqtt-username');
+        const mqttPasswordInput = document.getElementById('mqtt-password');
+        const mqttClientIdInput = document.getElementById('mqtt-client-id');
+        const mqttConnectBtn = document.getElementById('mqtt-connect');
+        const mqttDisconnectBtn = document.getElementById('mqtt-disconnect');
+        const videoUrlInput = document.getElementById('video-url');
+        const videoConnectBtn = document.getElementById('video-connect');
+        const videoDisconnectBtn = document.getElementById('video-disconnect');
+        const videoPlayer = document.getElementById('video-player');
+        const videoPlaceholder = document.getElementById('video-placeholder');
+        const customCommandInput = document.getElementById('custom-command');
+        const sendCustomBtn = document.getElementById('send-custom');
+        const outputTopic1Input = document.getElementById('output-topic1');
+        const outputTopic2Input = document.getElementById('output-topic2');
+        const outputTopic3Input = document.getElementById('output-topic3');
+        const outputContainer1 = document.getElementById('output-container1');
+        const outputContainer2 = document.getElementById('output-container2');
+        const outputContainer3 = document.getElementById('output-container3');
+        
+        // LQR inputs
+        const lqrParam1 = document.getElementById('lqr-param1');
+        const lqrParam2 = document.getElementById('lqr-param2');
+        const lqrParam3 = document.getElementById('lqr-param3');
+        const btnLqr = document.getElementById('btn-lqr');
+        const CoeffV = document.getElementById('coeff-n');
+        const CoeffN = document.getElementById('coeff-v');
+        const btnSetCoeffsn = document.getElementById('btn-set-coeffs-n');
+        
+        // Coefficient inputs
+        const coeffInputs = [];
+        for (let i = 1; i <= 12; i++) {
+            coeffInputs.push(document.getElementById(`coeff-${i}`));
+        }
+        const btnSetCoeffs = document.getElementById('btn-set-coeffs');
+        
+        // Global variables
+        let client = null;
+        let hls = null;
+        let controlTopic = 'drone/input';
+        
+        // Load saved values from localStorage
+        function loadSavedValues() {
+            if (localStorage.getItem('mqttBroker')) {
+                mqttBrokerInput.value = localStorage.getItem('mqttBroker');
+            }
+            if (localStorage.getItem('mqttUsername')) {
+                mqttUsernameInput.value = localStorage.getItem('mqttUsername');
+            }
+            if (localStorage.getItem('mqttClientId')) {
+                mqttClientIdInput.value = localStorage.getItem('mqttClientId');
+            }
+            if (localStorage.getItem('videoUrl')) {
+                videoUrlInput.value = localStorage.getItem('videoUrl');
+            }
+            if (localStorage.getItem('controlTopic')) {
+                controlTopic = localStorage.getItem('controlTopic');
+            }
+            if (localStorage.getItem('outputTopic1')) {
+                outputTopic1Input.value = localStorage.getItem('outputTopic1');
+            }
+            if (localStorage.getItem('outputTopic2')) {
+                outputTopic2Input.value = localStorage.getItem('outputTopic2');
+            }
+            if (localStorage.getItem('outputTopic3')) {
+                outputTopic3Input.value = localStorage.getItem('outputTopic3');
+            }
+            if (localStorage.getItem('customCommand')) {
+                customCommandInput.value = localStorage.getItem('customCommand');
+            }
+            
+            // Load LQR parameters
+            if (localStorage.getItem('lqrParam1')) {
+                lqrParam1.value = localStorage.getItem('lqrParam1');
+            }
+            if (localStorage.getItem('lqrParam2')) {
+                lqrParam2.value = localStorage.getItem('lqrParam2');
+            }
+            if (localStorage.getItem('lqrParam3')) {
+                lqrParam3.value = localStorage.getItem('lqrParam3');
+            }
+            
+            // Load coefficient values
+            for (let i = 1; i <= 12; i++) {
+                if (localStorage.getItem(`coeff${i}`)) {
+                    coeffInputs[i-1].value = localStorage.getItem(`coeff${i}`);
+                }
+            }
+        }
+
+        // Save values to localStorage
+        function saveValues() {
+            localStorage.setItem('mqttBroker', mqttBrokerInput.value);
+            localStorage.setItem('mqttUsername', mqttUsernameInput.value);
+            localStorage.setItem('mqttClientId', mqttClientIdInput.value);
+            localStorage.setItem('videoUrl', videoUrlInput.value);
+            localStorage.setItem('controlTopic', controlTopic);
+            localStorage.setItem('outputTopic1', outputTopic1Input.value);
+            localStorage.setItem('outputTopic2', outputTopic2Input.value);
+            localStorage.setItem('outputTopic3', outputTopic3Input.value);
+            localStorage.setItem('customCommand', customCommandInput.value);
+        }
+        
+        // Save LQR parameters
+        function saveLqrParams() {
+            localStorage.setItem('lqrParam1', lqrParam1.value);
+            localStorage.setItem('lqrParam2', lqrParam2.value);
+            localStorage.setItem('lqrParam3', lqrParam3.value);
+        }
+        
+        // Save coefficient values
+        function saveCoefficients() {
+            for (let i = 1; i <= 12; i++) {
+                localStorage.setItem(`coeff${i}`, coeffInputs[i-1].value);
+            }
+        }
+
+        // MQTT Connection
+        mqttConnectBtn.addEventListener('click', function() {
+            if (client) {
+                console.log('Already connected');
+                return;
+            }
+
+            const broker = mqttBrokerInput.value;
+            const username = mqttUsernameInput.value || undefined;
+            const password = mqttPasswordInput.value || undefined;
+            const clientId = mqttClientIdInput.value || 'drone_control_panel_' + Math.random().toString(16).substr(2, 8);
+
+            const options = {
+                clientId: clientId,
+                clean: true,
+                reconnectPeriod: 1000
+            };
+
+            if (username) {
+                options.username = username;
+                options.password = password;
+            }
+
+            try {
+                console.log('Connecting to MQTT broker:', broker);
+                client = mqtt.connect(broker, options);
+                
+                client.on('connect', function() {
+                    console.log('Connected to MQTT broker');
+                    mqttStatusIndicator.classList.remove('disconnected');
+                    mqttStatusIndicator.classList.add('connected');
+                    mqttStatusText.textContent = 'Connected to ' + broker;
+                    mqttConnectBtn.disabled = true;
+                    mqttDisconnectBtn.disabled = false;
+                    
+                    // Subscribe to output topics
+                    client.subscribe(outputTopic1Input.value, { qos: 0 });
+                    client.subscribe(outputTopic2Input.value, { qos: 0 });
+                    client.subscribe(outputTopic3Input.value, { qos: 0 });
+                    
+                    // Save values to localStorage
+                    saveValues();
+                });
+                
+                client.on('message', function(topic, message) {
+                    console.log('Received message:', topic, message.toString());
+                    const timestamp = new Date().toLocaleTimeString();
+                    const messageHtml = `<div><strong>${timestamp}</strong>: ${message.toString()}</div>`;
+                    
+                    if (topic === outputTopic1Input.value) {
+                        outputContainer1.innerHTML += messageHtml;
+                        outputContainer1.scrollTop = outputContainer1.scrollHeight;
+                    } else if (topic === outputTopic2Input.value) {
+                        outputContainer2.innerHTML += messageHtml;
+                        outputContainer2.scrollTop = outputContainer2.scrollHeight;
+                    } else if (topic === outputTopic3Input.value) {
+                        outputContainer3.innerHTML += messageHtml;
+                        outputContainer3.scrollTop = outputContainer3.scrollHeight;
+                    }
+                });
+                
+                client.on('error', function(err) {
+                    console.error('MQTT Error:', err);
+                    mqttStatusText.textContent = 'Error: ' + err.message;
+                });
+                
+                client.on('close', function() {
+                    console.log('MQTT connection closed');
+                    mqttStatusIndicator.classList.remove('connected');
+                    mqttStatusIndicator.classList.add('disconnected');
+                    mqttStatusText.textContent = 'Disconnected';
+                    mqttConnectBtn.disabled = false;
+                    mqttDisconnectBtn.disabled = true;
+                });
+            } catch (error) {
+                console.error('Failed to connect to MQTT broker:', error);
+                mqttStatusText.textContent = 'Error: ' + error.message;
+            }
+        });
+
+        mqttDisconnectBtn.addEventListener('click', function() {
+            if (client) {
+                client.end();
+                client = null;
+            }
+        });
+
+        // Video Player
+        videoConnectBtn.addEventListener('click', function() {
+            const videoUrl = videoUrlInput.value;
+            
+            if (!videoUrl) {
+                alert('Please enter a video URL');
+                return;
+            }
+            
+            if (Hls.isSupported()) {
+                videoPlayer.style.display = 'block';
+                videoPlaceholder.style.display = 'none';
+                
+                if (hls) {
+                    hls.destroy();
+                }
+                
+                hls = new Hls({
+                    lowLatencyMode: true,
+                    liveSyncDurationCount: 3,
+                    liveMaxLatencyDurationCount: 10
+                });
+                
+                hls.loadSource(videoUrl);
+                hls.attachMedia(videoPlayer);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    videoPlayer.play().catch(error => {
+                        console.warn('Auto-play was prevented. Please interact with the document first:', error);
+                    });
+                });
+                
+                hls.on(Hls.Events.ERROR, function(event, data) {
+                    console.error('HLS error:', data);
+                    if (data.fatal) {
+                        switch(data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                hls.startLoad();
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                hls.recoverMediaError();
+                                break;
+                            default:
+                                hls.destroy();
+                                showVideoPlaceholder('Video playback error: ' + data.details);
+                                break;
+                        }
+                    }
+                });
+                
+                videoConnectBtn.disabled = true;
+                videoDisconnectBtn.disabled = false;
+                localStorage.setItem('videoUrl', videoUrl);
+            } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+                // For Safari which has built-in HLS support
+                videoPlayer.src = videoUrl;
+                videoPlayer.style.display = 'block';
+                videoPlaceholder.style.display = 'none';
+                videoPlayer.play().catch(error => {
+                    console.warn('Auto-play was prevented:', error);
+                });
+                videoConnectBtn.disabled = true;
+                videoDisconnectBtn.disabled = false;
+                localStorage.setItem('videoUrl', videoUrl);
+            } else {
+                showVideoPlaceholder('HLS is not supported in your browser');
+            }
+        });
+
+        videoDisconnectBtn.addEventListener('click', function() {
+            if (hls) {
+                hls.destroy();
+                hls = null;
+            }
+            videoPlayer.src = '';
+            videoPlayer.style.display = 'none';
+            showVideoPlaceholder('Video stream disconnected');
+            videoConnectBtn.disabled = false;
+            videoDisconnectBtn.disabled = true;
+        });
+
+        function showVideoPlaceholder(message) {
+            videoPlaceholder.textContent = message;
+            videoPlaceholder.style.display = 'flex';
+        }
+
+        // Control buttons
+        function setupControlButtons() {
+            // STOP button (QoS 2)
+            document.getElementById('btn-stop').addEventListener('click', function() {
+                publishMessage('STOP', 2);
+            });
+            
+            // All other buttons (QoS 0)
+            const buttons = [
+                'btn-down', 'btn-calibrate', 'btn-echo', 'btn-esp-echo', 
+                'btn-cube', 'btn-restart-esp', 'btn-test-motors', 
+                'btn-restart-drone', 'btn-get-acc-pos', 'btn-get-gyro'
+            ];
+            
+            buttons.forEach(btnId => {
+                document.getElementById(btnId).addEventListener('click', function() {
+                    const command = this.value;
+                    publishMessage(command, 0);
+                });
+            });
+            
+            // LQR button with its parameters
+            btnLqr.addEventListener('click', function() {
+                const param1 = lqrParam1.value || '0';
+                const param2 = lqrParam2.value || '0';
+                const param3 = lqrParam3.value || '0';
+                const command = `LQR${param1},${param2},${param3}`;
+                publishMessage(command, 0);
+                saveLqrParams();
+            });
+            
+            // SET COEFFS button with its parameters
+            btnSetCoeffs.addEventListener('click', function() {
+                const coeffValues = coeffInputs.map(input => input.value || '0');
+                const command = `SC${coeffValues.join(',')}`;
+                publishMessage(command, 0);
+                saveCoefficients();
+            });
+
+            btnSetCoeffsn.addEventListener('click', function() {
+                const coeffValues = coeffInputs.map(input => input.value || '0');
+                const coeffn  = CoeffN.value || '0';
+                const coeffv = CoeffV.value || '0';
+                const command = `SK${coeffn},${coeffv}`;
+                publishMessage(command, 0);
+                //saveCoefficients();
+            });
+            
+            // Custom command
+            sendCustomBtn.addEventListener('click', function() {
+                const command = customCommandInput.value.trim();
+                if (command) {
+                    publishMessage(command, 0);
+                    localStorage.setItem('customCommand', command);
+                }
+            });
+            
+            // Allow pressing Enter in the custom command input
+            customCommandInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const command = this.value.trim();
+                    if (command) {
+                        publishMessage(command, 0);
+                        localStorage.setItem('customCommand', command);
+                    }
+                }
+            });
+        }
+
+        function publishMessage(message, qos) {
+            if (!client || !client.connected) {
+                alert('Not connected to MQTT broker');
+                return;
+            }
+            
+            console.log(`Publishing message: ${message} to ${controlTopic} with QoS ${qos}`);
+            client.publish(controlTopic, message, { qos: qos, retain: false }, function(err) {
+                if (err) {
+                    console.error('Error publishing message:', err);
+                    alert('Failed to publish message: ' + err.message);
+                } else {
+                    console.log('Message published successfully');
+                }
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSavedValues();
+            setupControlButtons();
+            
+            // Update control topic if output topics change
+            outputTopic1Input.addEventListener('change', function() {
+                localStorage.setItem('outputTopic1', this.value);
+                if (client && client.connected) {
+                    client.unsubscribe(localStorage.getItem('outputTopic1'));
+                    client.subscribe(this.value, { qos: 0 });
+                }
+            });
+            
+            outputTopic2Input.addEventListener('change', function() {
+                localStorage.setItem('outputTopic2', this.value);
+                if (client && client.connected) {
+                    client.unsubscribe(localStorage.getItem('outputTopic2'));
+                    client.subscribe(this.value, { qos: 0 });
+                }
+            });
+            
+            outputTopic3Input.addEventListener('change', function() {
+                localStorage.setItem('outputTopic3', this.value);
+                if (client && client.connected) {
+                    client.unsubscribe(localStorage.getItem('outputTopic3'));
+                    client.subscribe(this.value, { qos: 0 });
+                }
+            });
+            
+            // Add listeners for LQR parameter changes
+            lqrParam1.addEventListener('change', saveLqrParams);
+            lqrParam2.addEventListener('change', saveLqrParams);
+            lqrParam3.addEventListener('change', saveLqrParams);
+            
+            // Add listeners for coefficient changes
+            coeffInputs.forEach(input => {
+                input.addEventListener('change', saveCoefficients);
+            });
+        });
+    </script>
+</body>
+</html>

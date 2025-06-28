@@ -1,0 +1,100 @@
+/* This file is referenced in the Flask app but all styles are inline in the HTML template for simplicity */
+/* You can move the styles from the template to this file if preferred */
+body {
+    font-family: Arial, sans-serif;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.section {
+    border: 1px solid #ccc;
+    padding: 15px;
+    border-radius: 5px;
+}
+.video-container {
+    width: 100%;
+    background-color: #000;
+    aspect-ratio: 16/9;
+    position: relative;
+}
+.video-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    background-color: #333;
+}
+video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.control-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+.button {
+    padding: 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+.button:hover {
+    background-color: #45a049;
+}
+.button.stop {
+    background-color: #f44336;
+}
+.button.stop:hover {
+    background-color: #d32f2f;
+}
+.input-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.input-group input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+.mqtt-status {
+    padding: 8px;
+    background-color: #f1f1f1;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+.output-container {
+    background-color: #f1f1f1;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    height: 150px;
+    overflow-y: auto;
+    margin-top: 10px;
+}
+.status {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+.status.connected {
+    background-color: #4CAF50;
+}
+.status.disconnected {
+    background-color: #f44336;
+}

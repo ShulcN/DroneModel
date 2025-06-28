@@ -1,0 +1,483 @@
+\chapter{Приложение Г}
+
+Листинг кода детектора визуальных маркеров Apriltag.
+
+\begin{lstlisting}[language=Python]
+import cv2
+import numpy as np
+import time
+import argparse
+import threading
+import socket
+import json
+import os
+import signal
+import paho.mqtt.client as mqtt
+import subprocess
+from threading import Thread
+from dotenv import load_dotenv
+import sys
+
+class CameraStream:
+    def __init__(self, source_type='usb', device_id=0, rtsp_input=None, rtsp_output=None, resolution=(640, 480)):
+        self.source_type = source_type
+        self.device_id = device_id
+        self.rtsp_input = rtsp_input
+        self.rtsp_output = rtsp_output
+        self.cap = None
+        self.frame = None
+        self.running = False
+        self.stream_process = None
+        self.frame_out = None
+        self.resolution = resolution
+        self.width, self.height = resolution
+        self.thread = None
+        self.readed = False
+
+    def start(self):
+        if self.source_type == 'usb':
+            self.cap = cv2.VideoCapture(self.device_id)
+            # Set resolution
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+        elif self.source_type == 'picamera':
+            # For Raspberry Pi Camera
+            try:
+                from picamera2 import Picamera2
+                self.cap = Picamera2()
+                self.cap.configure(self.cap.create_preview_configuration(
+                    main={"format": 'RGB888', "size": (self.width, self.height)}))
+                self.cap.start()
+                # Emulate the interface like a regular cv2.VideoCapture
+                self.is_picamera = True
+            except ImportError:
+                print("Failed to import picamera2 module. Make sure it is installed.")
+                return False
+        elif self.source_type == 'rtsp':
+            if not self.rtsp_input:
+                print("RTSP stream URL not specified")
+                return False
+            self.cap = cv2.VideoCapture(self.rtsp_input)
+        else:
+            print(f"Unknown source type: {self.source_type}")
+            return False
+
+        # Check if the camera opened successfully
+        if self.source_type != 'picamera':
+            if not self.cap.isOpened():
+                print(f"Failed to open source {self.source_type}")
+                return False
+
+        self.running = True
+
+        self.thread = Thread(target=self._update, args=())
+        self.thread.daemon = True
+        self.thread.start()
+        if self.rtsp_output:
+            self._start_rtsp_stream()
+
+        return True
+
+    def _update(self):
+        while self.running:
+            if self.source_type == 'picamera':
+                # For Raspberry Pi Camera, use a different method to get the frame
+                self.frame = self.cap.capture_array()
+                time.sleep(0.001)  # Small delay to save resources
+            else:
+                ret, frame = self.cap.read()
+                if ret:
+                    self.readed = False
+                    self.frame = frame
+                else:
+                    print("Error reading frame")
+                    time.sleep(0.1)  # Pause before retrying
+
+    def _start_rtsp_stream(self):
+        width = self.width
+        height = self.height
+
+        if self.source_type != 'picamera':
+            width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+       
+        os.makedirs('temp', exist_ok=True)
+
+        self.pipe_path = os.path.join('temp', 'stream_pipe.yuv')
+
+        command = [
+            'ffmpeg',
+            '-f', 'rawvideo',
+            '-vcodec', 'rawvideo',
+            '-pixel_format', 'bgr24',
+            '-s', f"{width}x{height}",
+            '-framerate', '10',
+            '-i', self.pipe_path,
+            '-pix_fmt', 'yuv420p',
+            '-c:v', 'libx264',
+            '-x264-params', 'keyint=5:min-keyint=5',
+            '-preset', 'ultrafast',
+            '-f', 'rtsp',
+            '-rtsp_transport', 'tcp',
+            self.rtsp_output
+        ]
+
+        try:
+            os.mkfifo(self.pipe_path)
+        except FileExistsError:
+            pass
+
+        self.stream_process = subprocess.Popen(command, stdin=subprocess.PIPE)
+
+        self.stream_thread = Thread(target=self._stream_frames, args=())
+        self.stream_thread.daemon = True
+        self.stream_thread.start()
+
+    def _stream_frames(self):
+        pipe_fd = os.open(self.pipe_path, os.O_WRONLY)
+
+        while self.running:
+            if self.frame_out is not None:
+                try:
+                    os.write(pipe_fd, self.frame_out.tobytes())
+                    self.frame_out = None
+                except BrokenPipeError:
+                    print("Error sending frame to FFmpeg")
+                    break
+            time.sleep(0.01)  # Small delay
+
+        os.close(pipe_fd)
+
+    def read(self):
+        if self.readed or self.frame is None:
+            return False, None
+        self.readed = True
+        return True, self.frame.copy()
+
+    def stop(self):
+        self.running = False
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=1.0)
+
+        if self.source_type == 'picamera':
+            if self.cap:
+                self.cap.stop()
+        else:
+            if self.cap:
+                self.cap.release()
+
+        if self.stream_process:
+            self.stream_process.terminate()
+            self.stream_process.wait()
+
+        if hasattr(self, 'pipe_path') and os.path.exists(self.pipe_path):
+            os.unlink(self.pipe_path)
+
+class ArUcoTracker:
+    def __init__(self, tag_size=0.1, camera_params_file=None,
+                    show_fps=True, debug=False, log_file=None, history_length=5,
+                    source_type='usb', camera_index=0, rtsp_input=None, rtsp_output=None,
+                    display_output=True, resolution=(640, 480), mqtt_enabled=False):
+        self.tag_size = tag_size
+        self.camera_params_file = camera_params_file
+        self.show_fps = show_fps
+        self.debug = debug
+        self.log_file_name = log_file
+        self.log_file = None
+        self.history_length = history_length
+        self.source_type = source_type
+        self.camera_index = camera_index
+        self.rtsp_input = rtsp_input
+        self.rtsp_output = rtsp_output
+        self.display_output = display_output
+        self.resolution = resolution
+        self.mqtt_enabled = mqtt_enabled
+
+        self.camera_matrix, self.dist_coeffs = self.load_camera_params(camera_params_file)
+
+        self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_36h11)
+        self.parameters = cv2.aruco.DetectorParameters()
+
+        self.parameters.adaptiveThreshWinSizeMin = 7    # minimum window size
+        self.parameters.adaptiveThreshWinSizeMax     = 49   # increased window for distant tags
+        self.parameters.adaptiveThreshWinSizeStep    = 7    # step size for change
+        self.parameters.adaptiveThreshConstant       = 25   # reduced offset (less aggressive)
+
+        self.parameters.minMarkerLengthRatioOriginalImg = 0.015  # cut off small artifacts
+        self.parameters.maxMarkerPerimeterRate         = 3.0    # slightly more to capture "large" ones up close
+        self.parameters.minMarkerPerimeterRate         = 0.02   # slightly higher to filter out very small ones
+
+        self.parameters.maxErroneousBitsInBorderRate   = 0.85   # increase border accuracy
+        self.parameters.aprilTagMaxNmaxima             = 1      # leave the first maximum
+
+        self.parameters.cornerRefinementMethod         = cv2.aruco.CORNER_REFINE_SUBPIX
+        self.parameters.cornerRefinementWinSize        = 11     # window for subpixel
+        self.parameters.cornerRefinementMaxIterations  = 30     # number of iterations
+
+        self.parameters.perspectiveRemovePixelPerCell  = 16     # slightly more pixels per cell
+        self.parameters.perspectiveRemoveIgnoredMarginPerCell = 0.35 # less "white" border
+
+        self.parameters.minGroupDistance               = 0.05   # leave default
+        self.parameters.minMarkerDistanceRate          = 0.05   # slightly higher
+        self.parameters.minOtsuStdDev                  = 5.0    # slightly lower so binarization skips less
+
+        self.aruco_detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.parameters)
+
+        self.position_history = {}  # Dictionary to store history for each tag
+
+        if self.mqtt_enabled:
+            self.setup_mqtt()
+
+        self.running = True
+
+    def setup_mqtt(self):
+        load_dotenv()
+
+        mqtt_broker = os.getenv("MQTT_BROKER", "localhost")
+        mqtt_port = int(os.getenv("MQTT_PORT", 1883))
+        mqtt_username = os.getenv("MQTT_USERNAME", "")
+        mqtt_password = os.getenv("MQTT_PASSWORD", "")
+        mqtt_topic_prefix = os.getenv("MQTT_TOPIC_PREFIX", "aruco")
+
+        self.mqtt_topic_prefix = mqtt_topic_prefix
+
+        self.mqtt_client = mqtt.Client()
+
+        if mqtt_username and mqtt_password:
+            self.mqtt_client.username_pw_set(mqtt_username, mqtt_password)
+
+        try:
+            self.mqtt_client.connect(mqtt_broker, mqtt_port, 60)
+            self.mqtt_client.loop_start()
+            print(f"MQTT client connected to {mqtt_broker}:{mqtt_port}")
+        except Exception as e:
+            print(f"Error connecting to MQTT broker: {e}")
+            self.mqtt_enabled = False
+
+    def load_camera_params(self, camera_params_file=None):
+        try:
+            if camera_params_file:
+                # If a specific file is specified, try to load from it
+                data = np.load(camera_params_file)
+                camera_matrix = data['camera_matrix']
+                dist_coeffs = data['dist_coeffs']
+                print(f"Loaded camera calibration parameters from file {camera_params_file}")
+            else:
+                data = np.load('camera_calibration.npz')
+                camera_matrix = data['camera_matrix']
+                dist_coeffs = data['dist_coeffs']
+                print("Loaded camera calibration parameters from the standard file")
+
+            return camera_matrix, dist_coeffs
+        except:
+            print("WARNING: Calibration file not found. Using default values.")
+            width, height = self.resolution
+            fx = width * 1.2  # approximate scaling factor
+            fy = height * 1.2
+            cx = width / 2
+            cy = height / 2
+
+            camera_matrix = np.array([
+                [fx, 0, cx],
+                [0, fy, cy],
+                [0, 0, 1]
+            ], dtype=np.float32)
+
+            dist_coeffs = np.array([0, 0, 0, 0, 0], dtype=np.float32)
+
+            return camera_matrix, dist_coeffs
+
+            
+    def start(self):
+        if self.log_file_name:
+            self.log_file = open(self.log_file_name, "w")
+            self.log_file.write("timestamp,tag_id,x,y,z,roll,pitch,yaw\n")
+            self.log_file.flush()
+    
+        self.camera = CameraStream(
+            source_type=self.source_type,
+            device_id=self.camera_index,
+            rtsp_input=self.rtsp_input,
+            rtsp_output=self.rtsp_output,
+            resolution=self.resolution
+        )
+    
+        if not self.camera.start():
+            print("Error initializing camera")
+            return
+    
+        prev_frame_time = 0
+        new_frame_time = 0
+    
+        print("Starting ArUco tag tracking...")
+        print("Press Ctrl+C to exit")
+    
+        signal.signal(signal.SIGINT, self.signal_handler)
+    
+        try:
+            while self.running:
+                ret, frame_s = self.camera.read()
+                if not ret:
+                    time.sleep(0.01)
+                    continue
+    
+                frame = frame_s.copy()
+    
+                new_frame_time = time.time()
+                fps = 1/(new_frame_time - prev_frame_time) if prev_frame_time > 0 else 0
+                prev_frame_time = new_frame_time
+    
+                if self.show_fps and self.display_output:
+                    cv2.putText(frame, f"FPS: {fps:.1f}", (10, 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    
+                corners, ids, rejected = self.aruco_detector.detectMarkers(frame)
+    
+                if ids is not None:
+                    print("Detected!")
+                    if self.display_output:
+                        cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+    
+                    for i in range(len(ids)):
+                        self.process_tag(ids[i][0], corners[i], frame)
+                if self.camera.rtsp_output:
+                    self.camera.frame_out = frame
+    
+        except Exception as e:
+            print(f"An error occurred: {e}")
+    
+        finally:
+            self.cleanup()
+    
+        
+    def signal_handler(self, sig, frame):
+        print("\nTermination signal received. Closing resources...")
+        self.running = False
+    
+    
+    def cleanup(self):
+        if hasattr(self, 'camera'):
+            self.camera.stop()
+    
+        if self.log_file:
+            self.log_file.close()
+            print(f"\nCoordinates saved to file {self.log_file_name}")
+    
+        if self.mqtt_enabled:
+            self.mqtt_client.loop_stop()
+            self.mqtt_client.disconnect()
+    
+    
+    def process_tag(self, tag_id, corners, frame):
+        corner_points = corners.reshape(4, 2).astype(int)
+        center = np.mean(corner_points, axis=0).astype(int)
+    
+        if self.display_output:
+            frame = cv2.circle(frame, tuple(center), 5, (0, 0, 255), -1)
+    
+        obj_pts = np.array([
+            [-self.tag_size/2, -self.tag_size/2, 0],
+            [ self.tag_size/2, -self.tag_size/2, 0],
+            [ self.tag_size/2,  self.tag_size/2, 0],
+            [-self.tag_size/2,  self.tag_size/2, 0]
+        ])
+    
+        img_pts = corners.reshape(4, 2)
+    
+        success, rvec, tvec = cv2.solvePnP(obj_pts, img_pts, self.camera_matrix, self.dist_coeffs)
+    
+        if success:
+            x, y, z = tvec.flatten()
+    
+            if tag_id not in self.position_history:
+                self.position_history[tag_id] = []
+    
+            self.position_history[tag_id].append((x, y, z))
+    
+            if len(self.position_history[tag_id]) > self.history_length:
+                self.position_history[tag_id].pop(0)
+    
+            x_avg, y_avg, z_avg = np.mean(self.position_history[tag_id], axis=0)
+    
+            if self.display_output:
+                frame = cv2.putText(frame, f"X: {x_avg:.2f}m", (center[0] + 10, center[1] + 20),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+                frame = cv2.putText(frame, f"Y: {y_avg:.2f}m", (center[0] + 10, center[1] + 40),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+                frame = cv2.putText(frame, f"Z: {z_avg:.2f}m", (center[0] + 10, center[1] + 60),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+    
+            if self.log_file:
+                timestamp = time.time()
+                self.log_file.write(f"{timestamp},{tag_id},{x_avg:.6f},{y_avg:.6f},{z_avg:.6f},"
+                                    f"{np.degrees(roll):.2f},{np.degrees(pitch):.2f},{np.degrees(yaw):.2f}\n")
+                self.log_file.flush()
+    
+            if self.mqtt_enabled:
+                self.send_mqtt_data(tag_id, x_avg, y_avg, z_avg)
+    
+            print(f"Tag {tag_id}: X={x_avg:.3f}m, Y={y_avg:.3f}m, Z={z_avg:.3f}m", end="\r")
+    
+    
+    def send_mqtt_data(self, tag_id, x, y, z):
+        try:
+            data = [round(float(x),3), round(float(y),3), round(float(z),3)]
+    
+            topic = f"{self.mqtt_topic_prefix}"
+            self.mqtt_client.publish(topic, json.dumps(data))
+    
+            self.mqtt_client.publish(f"{self.mqtt_topic_prefix}", json.dumps(data))
+    
+        except Exception as e:
+            if self.debug:
+                print(f"Error sending MQTT data: {e}")
+        
+def main():
+    parser = argparse.ArgumentParser(description='ArUco tag tracking')
+    parser.add_argument('--size', type=float, default=0.1)
+    parser.add_argument('--camera', type=int, default=0)
+    parser.add_argument('--no-fps', action='store_false', dest='show_fps')
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--log-file', type=str, default=None)
+    parser.add_argument('--history-length', type=int, default=5)
+    parser.add_argument('--source-type', type=str, default='usb', choices=['usb', 'picamera', 'rtsp'])
+    parser.add_argument('--rtsp-input', type=str, default=None)
+    parser.add_argument('--rtsp-output', type=str, default=None)
+    parser.add_argument('--width', type=int, default=640)
+    parser.add_argument('--height', type=int, default=480)
+    parser.add_argument('--calibration-file', type=str, default=None)
+    parser.add_argument('--mqtt', action='store_true')
+    parser.add_argument('--no-display', action='store_false', dest='display_output')
+
+    args = parser.parse_args()
+
+    tracker = ArUcoTracker(
+        tag_size=args.size,
+        camera_params_file=args.calibration_file,
+        show_fps=args.show_fps,
+        debug=args.debug,
+        log_file=args.log_file,
+        history_length=args.history_length,
+        source_type=args.source_type,
+        camera_index=args.camera,
+        rtsp_input=args.rtsp_input,
+        rtsp_output=args.rtsp_output,
+        display_output=args.display_output,
+        resolution=(args.width, args.height),
+        mqtt_enabled=args.mqtt
+    )
+
+    try:
+        tracker.start()
+    except KeyboardInterrupt:
+        print("\nProgram stopped by user")
+    finally:
+        if hasattr(tracker, 'cleanup'):
+            tracker.cleanup()
+        
+if __name__ == "__main__":
+    main()
+\end{lstlisting}
+
+\endinput
