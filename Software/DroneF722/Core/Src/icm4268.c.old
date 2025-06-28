@@ -1,0 +1,283 @@
+#include "icm4268.h"
+
+//static HAL_StatusTypeDef ICM_WriteReg(uint8_t reg, uint8_t val) {
+//    uint8_t buf[2] = { reg & 0x7F, val };  // MSB=0 → запись
+//    HAL_GPIO_WritePin(ICM_CS_GPIO_Port, ICM_CS_Pin, GPIO_PIN_RESET);
+//    HAL_StatusTypeDef ret = HAL_SPI_Transmit(&hspi1, buf, 2, HAL_MAX_DELAY);
+//    HAL_GPIO_WritePin(ICM_CS_GPIO_Port, ICM_CS_Pin, GPIO_PIN_SET);
+//    return ret;
+//}
+//
+///* Чтение len байт начиная с reg */
+////HAL_StatusTypeDef ICM_ReadRegs(uint8_t reg, uint8_t *pdata, uint16_t len) {
+////    uint8_t tx[len + 1];
+////    uint8_t rx[len + 1];
+////
+////    tx[0] = reg | 0x80; // бит MSB = 1 для чтения
+////    for (int i = 1; i <= len; i++) {
+////        tx[i] = 0xFF; // dummy байты для чтения
+////    }
+////
+////    HAL_GPIO_WritePin(ICM_CS_GPIO_Port, ICM_CS_Pin, GPIO_PIN_RESET);
+////    HAL_StatusTypeDef ret = HAL_SPI_TransmitReceive(&hspi1, tx, rx, len + 1, HAL_MAX_DELAY);
+////    HAL_GPIO_WritePin(ICM_CS_GPIO_Port, ICM_CS_Pin, GPIO_PIN_SET);
+////
+////    if (ret != HAL_OK) return ret;
+////
+////    memcpy(pdata, &rx[1], len); // первые данные с позиции [1]
+////    return HAL_OK;
+////}
+//
+//HAL_StatusTypeDef ICM_ReadRegs(uint8_t reg, uint8_t *pdata, uint16_t len) {
+//    uint8_t tx = reg | 0x80; // Чтение + адрес
+//    HAL_GPIO_WritePin(ICM_CS_GPIO_Port, ICM_CS_Pin, GPIO_PIN_RESET);
+//    HAL_SPI_Transmit(&hspi1, &tx, 1, HAL_MAX_DELAY); // Отправка адреса
+//    HAL_SPI_Receive(&hspi1, pdata, len, HAL_MAX_DELAY); // Чтение данных
+//    HAL_GPIO_WritePin(ICM_CS_GPIO_Port, ICM_CS_Pin, GPIO_PIN_SET);
+//    return HAL_OK;
+//}
+//
+////HAL_StatusTypeDef ICM_ReadRegs(uint8_t reg, uint8_t *pdata, uint16_t len) {
+////    uint8_t addr = reg | 0x80;  // MSB=1 → чтение
+////    HAL_GPIO_WritePin(ICM_CS_GPIO_Port, ICM_CS_Pin, GPIO_PIN_RESET);
+////    HAL_StatusTypeDef ret = HAL_SPI_TransmitReceive(&hspi1, &addr, pdata, len+1, HAL_MAX_DELAY);
+////    HAL_GPIO_WritePin(ICM_CS_GPIO_Port, ICM_CS_Pin, GPIO_PIN_SET);
+////    if (ret != HAL_OK) return ret;
+////    // сдвигаем: pdata[0] = «мусор», реальные данные с pdata[1..]
+////    memmove(pdata, pdata+1, len);
+//////    uint8_t status;
+//////    ICM_ReadRegs(0x56, &status, 1);
+////    return HAL_OK;
+////}
+//
+///* Инициализация ICM-42688P */
+//HAL_StatusTypeDef ICM_Init(void) {
+//    uint8_t who = 0;
+//
+//    // 1) Вывести устройство из сна и выбрать автоген. clock
+//    if (ICM_WriteReg(ICM_REG_PWR_MGMT0, 0x01) != HAL_OK) return HAL_ERROR;
+//    HAL_Delay(50);
+//
+//    // 2) Проверка WHO_AM_I → 0x47
+//    if (ICM_ReadRegs(ICM_REG_WHO_AM_I, &who, 1) != HAL_OK) return HAL_ERROR;
+//    if (who != 0x47) return HAL_ERROR;
+//
+//    // 3) Отключить FIFO/INT
+//    ICM_WriteReg(0x2E, 0x00);
+//    ICM_WriteReg(0x5D, 0x00);
+//
+//    // 4) Настроить диапазоны: ±4 g, ±2000 °/s, ODR=1 kHz
+////    ICM_WriteReg(ICM_REG_ACCEL_CONFIG0, 0x09);
+////    ICM_WriteReg(ICM_REG_GYRO_CONFIG0,  0x07);
+//    // Настройка ±4g и ODR 1 kHz для акселерометра
+//    ICM_WriteReg(ICM_REG_ACCEL_CONFIG0, 0x46);  // ACCEL_FS_SEL=2 (0b010), ACCEL_ODR=6 (1 kHz)
+//
+//    // Настройка ±2000dps и ODR 1 kHz для гироскопа
+//    ICM_WriteReg(ICM_REG_GYRO_CONFIG0, 0x06);   // GYRO_FS_SEL=0 (0b000), GYRO_ODR=6 (1 kHz)
+//    HAL_Delay(50);
+//    // 5) Sample Rate Divider = 0 → 1 kHz
+//    ICM_WriteReg(0x4B, 0x00);
+//    HAL_Delay(30);
+//    return HAL_OK;
+//}
+//HAL_StatusTypeDef ICM_Init_Minimal(void) {
+//    uint8_t who;
+//
+//    // 1) Пробуждение
+//    if (ICM_WriteReg(ICM_REG_PWR_MGMT0, 0x0F) != HAL_OK) return HAL_ERROR;
+//    HAL_Delay(50);
+//    // тут же проверяем
+//    if (ICM_ReadRegs(ICM_REG_PWR_MGMT0, &who, 1) != HAL_OK) return HAL_ERROR;
+//    printf("After wake: PWR_MGMT0=0x%02X\r\n", who);
+//
+//    // 2) WHO_AM_I
+//    if (ICM_ReadRegs(ICM_REG_WHO_AM_I, &who, 1) != HAL_OK) return HAL_ERROR;
+//    printf("WHO_AM_I=0x%02X\r\n", who);
+//
+////    ICM_WriteReg(ICM_REG_ACCEL_CONFIG0, 0x09); // ±4g, 1 кГц
+////    ICM_WriteReg(ICM_REG_GYRO_CONFIG0,  0x07); // ±2000 °/s, 1 кГц
+////    ICM_WriteReg(0x4B, 0x00); // Sample rate divider = 0 → 1 кГц
+//    //ICM_WriteReg(ICM_REG_PWR_MGMT0, 0x0F);
+////    ICM_WriteReg(ICM_REG_ACCEL_CONFIG0, 0x46);
+////    ICM_WriteReg(ICM_REG_GYRO_CONFIG0, 0x06)
+//
+//    return HAL_OK;
+//}
+//
+///* Чтение «сырых» значений гироскопа (16‑бит на ось) */
+//HAL_StatusTypeDef ICM_ReadGyroRaw(int16_t raw[3]) {
+//    uint8_t buf[6];
+//    if (ICM_ReadRegs(ICM_REG_GYRO_XOUT_H, buf, 6) != HAL_OK) return HAL_ERROR;
+//    for (int i = 0; i < 3; i++) {
+//        raw[i] = (int16_t)(buf[2*i] << 8 | buf[2*i + 1]);
+//    }
+//    return HAL_OK;
+//}
+//
+///* Чтение ускорения в g (float) */
+//HAL_StatusTypeDef ICM_ReadAccel(float accel[3]) {
+//    uint8_t buf[6];
+//    if (ICM_ReadRegs(ICM_REG_ACCEL_XOUT_H, buf, 6) != HAL_OK) return HAL_ERROR;
+//    for (int i = 0; i < 3; i++) {
+//        //accel[i] = ((int16_t)(buf[2*i] << 8 | buf[2*i + 1])) / 8192.0f;
+//    	accel[i] = ((int16_t)(buf[2*i] << 8 | buf[2*i + 1])) / 8192.0f;
+//    }
+//    return HAL_OK;
+//}
+//
+///* Чтение угловой скорости в °/s (float) */
+//HAL_StatusTypeDef ICM_ReadGyro(float gyro[3]) {
+//    uint8_t buf[6];
+//    if (ICM_ReadRegs(ICM_REG_GYRO_XOUT_H, buf, 6) != HAL_OK) return HAL_ERROR;
+//    for (int i = 0; i < 3; i++) {
+//        gyro[i] = ((int16_t)(buf[2*i] << 8 | buf[2*i + 1])) / 16.384f;
+//    }
+//    return HAL_OK;
+//}
+//
+///* Калибровка гироскопа: вычисление смещения bias в °/s */
+//HAL_StatusTypeDef ICM_CalibrateGyro(float bias[3]) {
+//    const int samples = 500;
+//    int32_t sum[3] = {0};
+//    int16_t raw[3];
+//
+//    for (int i = 0; i < samples; i++) {
+//        if (ICM_ReadGyroRaw(raw) != HAL_OK) return HAL_ERROR;
+//        for (int j = 0; j < 3; j++) sum[j] += raw[j];
+//        HAL_Delay(2);
+//    }
+//    for (int j = 0; j < 3; j++) {
+//        bias[j] = sum[j] / (float)samples / 16.384f;
+//    }
+//    return HAL_OK;
+//}
+//
+//void ICM_EnableDataReadyInt(void) {
+//    // Настройка регистров INT датчика
+//    //ICM_WriteReg(0x57, 0x10);   // INT_CONFIG: active-high, latch
+////	ICM_WriteReg(0x57, 0x00);
+////    ICM_WriteReg(0x58, 0x03);   // INT_MAP: accel & gyro DR → INT1
+//	 ICM_WriteReg(0x56, 0x11);  // INT_CONFIG0: импульс 100 мкс, активный высокий
+//	ICM_WriteReg(0x66, 0x08);  // INT_SOURCE1: Data Ready на INT1
+//}
+
+
+static HAL_StatusTypeDef ICM_WriteReg(uint8_t reg, uint8_t val) {
+    uint8_t buf[2] = { reg & 0x7F, val };  // MSB=0 для записи
+    HAL_GPIO_WritePin(ICM_CS_GPIO_Port, ICM_CS_Pin, GPIO_PIN_RESET);
+    HAL_StatusTypeDef ret = HAL_SPI_Transmit(&hspi1, buf, 2, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(ICM_CS_GPIO_Port, ICM_CS_Pin, GPIO_PIN_SET);
+    return ret;
+}
+
+HAL_StatusTypeDef ICM_ReadRegs(uint8_t reg, uint8_t *pdata, uint16_t len) {
+    uint8_t addr = reg | 0x80;  // MSB=1 для чтения
+    HAL_GPIO_WritePin(ICM_CS_GPIO_Port, ICM_CS_Pin, GPIO_PIN_RESET);
+    // Объединить TX/RX в одну транзакцию:
+    HAL_StatusTypeDef ret = HAL_SPI_TransmitReceive(&hspi1, &addr, pdata, len+1, HAL_MAX_DELAY);
+    HAL_GPIO_WritePin(ICM_CS_GPIO_Port, ICM_CS_Pin, GPIO_PIN_SET);
+    if (ret != HAL_OK) return ret;
+    // Сдвигаем данные: pdata[0] содержит dummy (ответ на адрес), поэтому:
+    memmove(pdata, pdata+1, len);
+    return HAL_OK;
+}
+
+HAL_StatusTypeDef ICM_Init(void) {
+    uint8_t who;
+
+    // 1) Power Management
+    ICM_WriteReg(0x4E, 0x01);  // SLEEP=0, CLKSEL=Auto
+    HAL_Delay(50);
+
+    // 2) Check WHO_AM_I
+    ICM_ReadRegs(ICM_REG_WHO_AM_I, &who, 1);
+    if (who != 0x47) return HAL_ERROR;
+
+    // 3) Disable FIFO/IRQ
+    ICM_WriteReg(0x2E, 0x00);
+    ICM_WriteReg(0x5D, 0x00);
+
+    // 4) Configure accel & gyro ranges
+    ICM_WriteReg(0x14, 0x09);  // ±4g, 1 kHz
+    ICM_WriteReg(0x4F, 0x07);  // ±2000°/s, 1 kHz
+
+    // 5) Sample Rate Divider
+    ICM_WriteReg(0x4B, 0x00);  // SRD=0 → 1 kHz
+
+    HAL_Delay(10);
+    return HAL_OK;
+}
+HAL_StatusTypeDef ICM_ReadGyroRaw(int16_t raw[3]) {
+    uint8_t buf[6];
+    // Ждём готовности данных
+    uint8_t stat;
+    //do { ICM_ReadRegs(0x2D, &stat, 1); } while (!(stat & 0x01));
+    HAL_StatusTypeDef ret = ICM_ReadRegs(ICM_REG_GYRO_XOUT_H, buf, 6);
+    if (ret != HAL_OK) return ret;
+    for (int i = 0; i < 3; i++)
+        raw[i] = (int16_t)(buf[2*i] << 8 | buf[2*i+1]);
+    return HAL_OK;
+}
+
+//HAL_StatusTypeDef ICM_Init(void) {
+//    uint8_t who = 0;
+//    if (ICM_WriteReg(0x4E, 0x01) != HAL_OK) return HAL_ERROR;
+//        HAL_Delay(5);
+//    if (ICM_ReadRegs(ICM_REG_WHO_AM_I, &who, 1) != HAL_OK)  {
+//    	printf("WTF\r\n");
+//    	return HAL_ERROR;
+//    }
+//    if (who != 0x47) {
+//    	printf("ICM WHO_AM_I = 0x%02X\r\n", who);
+//    	return HAL_ERROR;    // проверка идентификатора
+//    }
+//
+//    // Настройка диапазонов (пример: ±4g и ±2000°/с)
+//    ICM_WriteReg(0x14, 0x09); // ACCEL_CONFIG0: ODR=1kHz, FS=±4g
+//    ICM_WriteReg(0x4E, 0x07); // GYRO_CONFIG0: ODR=1kHz, FS=±2000°/с
+//
+//    HAL_Delay(10);
+//    return HAL_OK;
+//}
+
+HAL_StatusTypeDef ICM_ReadAccel(float accel_data[3]) {
+    uint8_t buf[6];
+    HAL_StatusTypeDef ret = ICM_ReadRegs(ICM_REG_ACCEL_XOUT_H, buf, 6);
+    if (ret != HAL_OK) return ret;
+    // преобразование в int16
+    for (int i = 0; i < 3; i++) {
+        accel_data[i] = (((int16_t)buf[2*i] << 8) | buf[2*i + 1])/ 8192.0f;
+    }
+    return HAL_OK;
+}
+
+HAL_StatusTypeDef ICM_ReadGyro(float gyro_data[3]) {
+    uint8_t buf[6];
+    HAL_StatusTypeDef ret = ICM_ReadRegs(ICM_REG_GYRO_XOUT_H, buf, 6);
+    if (ret != HAL_OK) return ret;
+    for (int i = 0; i < 3; i++) {
+        gyro_data[i] = (((int16_t)buf[2*i] << 8) | buf[2*i + 1])/ 16.384f;;
+    }
+    return HAL_OK;
+}
+
+HAL_StatusTypeDef ICM_CalibrateGyro(float bias[3]) {
+    const int samples = 500;
+    int32_t sum[3] = {0};
+
+    int16_t raw[3];
+    for (int i = 0; i < samples; i++) {
+        if (ICM_ReadGyro(raw) != HAL_OK) {
+        	return HAL_ERROR;
+        }
+        for (int j = 0; j < 3; j++) {
+            sum[j] += raw[j];
+        }
+        HAL_Delay(2);  // небольшая задержка между измерениями
+    }
+
+    for (int j = 0; j < 3; j++) {
+        bias[j] = sum[j] / (float)samples / 16.384f; // перевод в °/s
+    }
+    return HAL_OK;
+}

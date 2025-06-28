@@ -1,0 +1,32 @@
+#ifndef SRC_ICM4268_H_
+#define SRC_ICM4268_H_
+
+#include "stm32f7xx_hal.h"
+
+//#define ICM_REG_WHO_AM_I        0x75
+//#define ICM_REG_ACCEL_XOUT_H    0x1F
+//#define ICM_REG_GYRO_XOUT_H     0x33
+#define ICM_REG_WHO_AM_I         0x75
+#define ICM_REG_PWR_MGMT0        0x4E
+#define ICM_REG_GYRO_CONFIG0     0x4F
+#define ICM_REG_ACCEL_CONFIG0    0x50
+#define ICM_REG_INT_STATUS       0x2D
+#define ICM_REG_GYRO_XOUT_H      0x33
+#define ICM_REG_ACCEL_XOUT_H     0x3B
+
+// Внешние объекты HAL
+extern SPI_HandleTypeDef hspi1;
+extern GPIO_TypeDef*    ICM_CS_GPIO_Port;
+extern uint16_t         ICM_CS_Pin;
+
+// Прототипы
+HAL_StatusTypeDef ICM_Init(void);
+HAL_StatusTypeDef ICM_Init_Minimal(void);
+HAL_StatusTypeDef ICM_ReadAccel(float accel_data[3]);
+HAL_StatusTypeDef ICM_ReadGyro (float gyro_data[3]);
+HAL_StatusTypeDef ICM_CalibrateGyro(float bias[3]);
+//HAL_StatusTypeDef ICM_ReadRegs(uint8_t reg, uint8_t *pdata, uint16_t len);
+HAL_StatusTypeDef ICM_ReadGyroRaw(int16_t raw[3]);
+void ICM_EnableDataReadyInt(void);
+HAL_StatusTypeDef ICM_ReadRegs(uint8_t reg, uint8_t *pdata, uint16_t len);
+#endif /* SRC_ICM4268_H_ */
